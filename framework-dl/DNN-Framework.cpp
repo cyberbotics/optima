@@ -208,7 +208,7 @@ void back_prop(vector<u_int8_t> input, vector<float> target){
 
 int main(void)
 {	
-	// Load MNIST using external library (https://github.com/wichtounet/mnist)
+	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
 	auto dataset = mnist::read_dataset<std::vector, std::vector, uint8_t, uint8_t>();
 
 	// Define input and target vector
