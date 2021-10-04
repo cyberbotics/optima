@@ -16,8 +16,6 @@
 
 using namespace std;
 
-
-
 class Neuron{
 	public:
 		vector<float> out_weights;
@@ -35,7 +33,7 @@ class Neuron{
 		Neuron(int input_size){
 			random_device rd{};
     		mt19937 generator{rd()};	
-			normal_distribution<float> normal(0.,1e-6);
+			normal_distribution<float> normal(0.,1e-5	);
 			for (int i = 0; i < input_size; i++) {
 				out_weights.push_back(normal(generator));
 				dw.push_back(0.);
@@ -222,41 +220,42 @@ float MSEdLoss(float input, float target){
 void forward_prop(vector<float> input){
 	vector<float> out;
 	float sum_of_elems;
-	Layer current_layer;
-	Neuron current_neuron;
+	
+	//Layer current_layer;
+	//Neuron current_neuron;
 
 	for(int j = 0; j<net.nb_layers; j++){
 		vector<float> hidden_x;
-		current_layer = net.layers[j];
+		//current_layer = net.layers[j];
 		if (j==0){ //input layer
-			for(int i = 0; i<current_layer.size; i++){
+			for(int i = 0; i<net.layers[j].size; i++){
 				sum_of_elems = 0;
-				current_neuron = current_layer.neurons[i];
-				for(int l = 0; l<current_neuron.out_weights.size(); l++){
-					sum_of_elems += current_neuron.out_weights[l] * input[l];
+				//current_neuron = net.layers[j].neurons[i];
+				for(int l = 0; l<net.layers[j].neurons[i].out_weights.size(); l++){
+					sum_of_elems += net.layers[j].neurons[i].out_weights[l] * input[l];
 				}
-				current_neuron.s = sum_of_elems + current_neuron.bias;
-				current_neuron.x = sigma(current_neuron.s);
+				net.layers[j].neurons[i].s = sum_of_elems + net.layers[j].neurons[i].bias;
+				net.layers[j].neurons[i].x = sigma(net.layers[j].neurons[i].s);
 
-				net.layers[j].neurons[i] = current_neuron;
+				//net.layers[j].neurons[i] = net.layers[j].neurons[i];
 			}
 
 		}
 		else{ //hidden layers
 			for(int k = 0; k<net.layers[j-1].size; k++){
 				hidden_x.push_back(net.layers[j-1].neurons[k].x);
+				//printf("%f\n", hidden_x[k]);
 			}
-			for(int i = 0; i<current_layer.size; i++){
+			for(int i = 0; i<net.layers[j].size; i++){
 				sum_of_elems = 0;
-				current_neuron = current_layer.neurons[i];
-				for(int l = 0; l<current_neuron.out_weights.size(); l++){
-					sum_of_elems += current_neuron.out_weights[l] * hidden_x[l];
+				//net.layers[j].neurons[i] = net.layers[j].neurons[i];
+				for(int l = 0; l<net.layers[j].neurons[i].out_weights.size(); l++){
+					sum_of_elems += net.layers[j].neurons[i].out_weights[l] * hidden_x[l];
 				}
-				current_neuron.s = sum_of_elems + current_neuron.bias;
+				net.layers[j].neurons[i].s = sum_of_elems + net.layers[j].neurons[i].bias;
+				net.layers[j].neurons[i].x = sigma(net.layers[j].neurons[i].s);
 
-				current_neuron.x = sigma(current_neuron.s);
-
-				net.layers[j].neurons[i] = current_neuron;
+				//net.layers[j].neurons[i] = net.layers[j].neurons[i];
 			}
 		}
 	}
@@ -295,9 +294,9 @@ void update_weights(float rate){
 	for(int i = 0; i < net.nb_layers; i++){
 		for(int j = 0; j< net.layers[i].size; j++){
 			for(int k = 0; k< net.layers[i].neurons[j].out_weights.size(); k++){
-				net.layers[i].neurons[j].out_weights[k] = net.layers[i].neurons[j].out_weights[k] - rate * net.layers[i].neurons[j].dw[k];
+				net.layers[i].neurons[j].out_weights[k] = net.layers[i].neurons[j].out_weights[k] - (rate * net.layers[i].neurons[j].dw[k]);
 			}
-			net.layers[i].neurons[j].bias = net.layers[i].neurons[j].bias - rate * net.layers[i].neurons[j].dbias;			
+			net.layers[i].neurons[j].bias = net.layers[i].neurons[j].bias - (rate * net.layers[i].neurons[j].dbias);			
 		}
 	}
 }
@@ -331,8 +330,8 @@ int main(void)
 	int train_input_size = train_input[0].size();
 	int train_target_size = train_target[0].size();
 
-	for(int j = 0; j<train_target_size; j++){
-		//printf("%f\n", train_target[50][j]);
+	for(int j = 0; j<train_input_size; j++){
+		//printf("%d", train_input_full[400][j]);
 	}
 
 	// Training parameters
@@ -345,12 +344,13 @@ int main(void)
 	int nb_layers = 2;
 	vector<Layer> net_layers;
 	vector<int> layer_size;
-	layer_size.insert( layer_size.end(), { train_input_size, hidden1, train_target_size} );
+	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
 		net_layers.push_back(Layer(layer_size[i],layer_size[i-1]));
 	}
 	net.setLayers(net_layers, nb_layers);
 
+	
 	// Training
 	for(int e = 0; e < nb_epochs; e++){
 		
@@ -368,7 +368,7 @@ int main(void)
 			vector<float> output_vector;
 			for(int j = 0; j<net.layers[nb_layers-1].size; j++){
 				output_vector.push_back(net.layers[nb_layers-1].neurons[j].x);
-				printf("%f, %d \n", output_vector[j],j);
+				//printf("%f, %d \n", output_vector[j],j);
 			}
 
 			acc_loss += MSELoss(output_vector, train_target[i]);
@@ -379,7 +379,6 @@ int main(void)
 		
 		printf("\n%.6f \n", acc_loss);	
 	}
-	
 
 	return 0;
 }
