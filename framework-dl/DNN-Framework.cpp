@@ -362,14 +362,12 @@ int main(void)
 				output_vector.push_back(net.layers[nb_layers-1].neurons[j].x);
 			}
 
-			acc_loss += MSELoss(output_vector, train_target[i]);
-			//acc_loss += MSELoss(output_vector, train_target);
-			
+			acc_loss += MSELoss(output_vector, train_target[i]);	
 		}
 
 		update_weights(learning_rate);
 
-		printf("\n%.6f \n", acc_loss);	
+		printf("\nLoss = %.6f \n", acc_loss);	
 	}
 
 	return 0;
