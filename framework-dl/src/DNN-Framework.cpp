@@ -53,39 +53,39 @@ class Neuron{
 		~Neuron(){};
 };
 
-class Layer{
+class Linear{
 	public:
 		int size;
 		vector<Neuron> neurons;
 
-		Layer(){};
+		Linear(){};
 
-		Layer(int s, int input_size){
+		Linear(int s, int input_size){
 			size = s;
 			for (int i = 0; i < s; i++) {
 				neurons.push_back(Neuron(input_size));
 			}
 		};
 
-		~Layer(){};
+		~Linear(){};
 
 };
 
 class Net{
 	public:
 		int nb_layers;
-		vector<Layer> layers;
+		vector<Linear> layers;
 
 		Net(){};
 
-		Net(vector<Layer> ls, int size){
+		Net(vector<Linear> ls, int size){
 			nb_layers = size;
 			for (int i = 0; i < size; i++) {
 				layers.push_back(ls[i]);
 			}
 		};
 
-		void setLayers(vector<Layer> ls, int size){
+		void setLayers(vector<Linear> ls, int size){
 			nb_layers = size;
 			for (int i = 0; i < size; i++) {
 				layers.push_back(ls[i]);
@@ -305,6 +305,17 @@ void reset_gradients(){
 	}
 }
 
+int verify_classification(){
+	vector<float> output_vector;
+	int pred;
+	for(int j = 0; j<net.layers[net.nb_layers-1].size; j++){
+		output_vector.push_back(net.layers[net.nb_layers-1].neurons[j].x);
+	}
+	pred = max_element(output_vector.begin(),output_vector.end()) - output_vector.begin();
+
+	return pred;
+}
+
 int main(void)
 {		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
@@ -312,31 +323,41 @@ int main(void)
 	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
-	int desired_nb_images = 1000;
+	int desired_nb_images = 6000;
 
 	vector<vector<u_int8_t>> train_input_full= dataset.training_images;
 	vector<u_int8_t> train_target_full= dataset.training_labels;
+	vector<vector<u_int8_t>> test_input_full= dataset.test_images;
+	vector<u_int8_t> test_target_full= dataset.test_labels;
 
 	vector<vector<float>> train_input = process_images(train_input_full, desired_nb_images);
 	vector<vector<float>> train_target = process_targets(train_target_full, desired_nb_images);
+	vector<vector<float>> test_input = process_images(test_input_full, desired_nb_images);
+	vector<vector<float>> test_target = process_targets(test_target_full, desired_nb_images);
 
 	int nb_images = train_input.size();
 	int train_input_size = train_input[0].size();
 	int train_target_size = train_target[0].size();
 
 	// Training parameters
-	int hidden1 = 50;
+	int nb_epochs = 2000;
 	float learning_rate = 0.1 / (float)nb_images;
+	int pred;
 	float acc_loss = 0.;
+	int nb_train_errors = 0;
+	int nb_test_errors = 0;
+	float perc_train_error = 0.;
+	float perc_test_error = 0.;
+		
 
 	// Net creation
-	int nb_epochs = 4;
+	int hidden1 = 50;
 	int nb_layers = 2;
-	vector<Layer> net_layers;
+	vector<Linear> net_layers;
 	vector<int> layer_size;
 	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
-		net_layers.push_back(Layer(layer_size[i],layer_size[i-1]));
+		net_layers.push_back(Linear(layer_size[i],layer_size[i-1]));
 	}
 	net.setLayers(net_layers, nb_layers);
 
@@ -344,9 +365,16 @@ int main(void)
 	// Training
 	for(int e = 0; e < nb_epochs; e++){
 		
+		// Decreasing Learning rate after some epochs
+		if(e==100 || e == 250){
+			learning_rate *= 0.5;
+		}
+
 		reset_gradients();
-		
+		nb_train_errors = 0;
+		nb_test_errors = 0;
 		acc_loss = 0.;
+		
 		printf("EPOCH %d\n", e);
 
 		for (int i = 0 ; i<nb_images; i++){
@@ -355,20 +383,33 @@ int main(void)
 			//printf("\r%% %.2f", fraction*100);
 
 			forward_prop(train_input[i]);
-			back_prop(train_input[i], train_target[i]);
 
-			
 			vector<float> output_vector;
-			for(int j = 0; j<net.layers[nb_layers-1].size; j++){
-				output_vector.push_back(net.layers[nb_layers-1].neurons[j].x);
+			for(int j = 0; j<net.layers[net.nb_layers-1].size; j++){
+				output_vector.push_back(net.layers[net.nb_layers-1].neurons[j].x);
 			}
+			if (train_target[i][verify_classification()] < 0.5){nb_train_errors++;}
+			
+			back_prop(train_input[i], train_target[i]);
 
 			acc_loss += MSELoss(output_vector, train_target[i]);	
 		}
 
 		update_weights(learning_rate);
 
-		printf("\nLoss = %.6f \n", acc_loss);	
+		
+    	for (int i = 0; i< nb_images; i++){
+			forward_prop(test_input[i]);
+        	if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
+		}
+			
+		
+		printf("\nLoss = %.6f \n", acc_loss);
+
+		perc_train_error = 100*(float)nb_train_errors/ (float)nb_images;
+		perc_test_error = 100*(float)nb_test_errors/ (float)nb_images;
+		printf("%% of train errors = %.1f%%\n", perc_train_error);
+		printf("%% of test errors = %.1f%%\n", perc_test_error);	
 	}
 
 	return 0;
