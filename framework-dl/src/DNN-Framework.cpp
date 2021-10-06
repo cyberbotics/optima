@@ -306,9 +306,10 @@ void reset_gradients(){
 }
 
 int main(void)
-{	
+{		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>();
+	const string& folder = "src/mnist";	
+	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
 	int desired_nb_images = 1000;
@@ -329,7 +330,7 @@ int main(void)
 	float acc_loss = 0.;
 
 	// Net creation
-	int nb_epochs = 3;
+	int nb_epochs = 4;
 	int nb_layers = 2;
 	vector<Layer> net_layers;
 	vector<int> layer_size;

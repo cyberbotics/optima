@@ -296,7 +296,8 @@ void reset_gradients(){
 int main(void)
 {	
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>();
+	const string& folder = "src/mnist";	
+	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
 	int desired_nb_images = 1000;
