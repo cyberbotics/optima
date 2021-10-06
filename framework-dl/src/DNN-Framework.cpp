@@ -340,7 +340,7 @@ int main(void)
 	int train_target_size = train_target[0].size();
 
 	// Training parameters
-	int nb_epochs = 2000;
+	int nb_epochs = 10;
 	float learning_rate = 0.1 / (float)nb_images;
 	int pred;
 	float acc_loss = 0.;
@@ -402,7 +402,6 @@ int main(void)
 			forward_prop(test_input[i]);
         	if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
 		}
-			
 		
 		printf("\nLoss = %.6f \n", acc_loss);
 
