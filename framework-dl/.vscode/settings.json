@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "random": "cpp",
-        "deque": "cpp",
-        "string": "cpp",
-        "vector": "cpp"
-    }
-}
