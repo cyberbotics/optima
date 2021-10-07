@@ -384,8 +384,7 @@ int main(void)
 		}
 
 		update_weights(learning_rate);
-
-		
+			
     	for (int i = 0; i< nb_images; i++){
 			forward_prop(test_input[i]);
         	if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}

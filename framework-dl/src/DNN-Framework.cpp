@@ -35,7 +35,7 @@ class Neuron{
 		Neuron(int input_size){
 			random_device rd;
     		default_random_engine e1(rd());	
-			normal_distribution<float> normal(0.,1e-6);
+			normal_distribution<float> normal(0.,1e-2);
 			for (int i = 0; i < input_size; i++) { 
 				out_weights.push_back(normal(e1));
 				dw.push_back(0.);
@@ -340,22 +340,23 @@ int main(void)
 	int train_target_size = train_target[0].size();
 
 	// Training parameters
-	int nb_epochs = 10;
+	int nb_epochs = 2000;
 	float learning_rate = 0.1 / (float)nb_images;
 	int pred;
 	float acc_loss = 0.;
+	float prev_loss = 0.;
 	int nb_train_errors = 0;
 	int nb_test_errors = 0;
 	float perc_train_error = 0.;
 	float perc_test_error = 0.;
-		
 
 	// Net creation
 	int hidden1 = 50;
-	int nb_layers = 2;
+	int hidden2 = 50;
+	int nb_layers = 3;
 	vector<Linear> net_layers;
 	vector<int> layer_size;
-	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
+	layer_size.insert(layer_size.end(), { train_input_size, hidden1, hidden2, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
 		net_layers.push_back(Linear(layer_size[i],layer_size[i-1]));
 	}
@@ -365,14 +366,10 @@ int main(void)
 	// Training
 	for(int e = 0; e < nb_epochs; e++){
 		
-		// Decreasing Learning rate after some epochs
-		if(e==100 || e == 250){
-			learning_rate *= 0.5;
-		}
-
 		reset_gradients();
 		nb_train_errors = 0;
 		nb_test_errors = 0;
+		prev_loss = acc_loss;
 		acc_loss = 0.;
 		
 		printf("EPOCH %d\n", e);
@@ -397,7 +394,11 @@ int main(void)
 
 		update_weights(learning_rate);
 
-		
+		// Decreasing Learning rate if oscillation
+		if(prev_loss < acc_loss){
+			learning_rate *= 0.8;
+		}
+
     	for (int i = 0; i< nb_images; i++){
 			forward_prop(test_input[i]);
         	if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
