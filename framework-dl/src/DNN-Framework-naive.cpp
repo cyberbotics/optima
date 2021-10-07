@@ -222,14 +222,14 @@ void forward_prop(vector<float> input){
 			sum_of_elems = 0.;
 			for(int l = 0; l<net.layers[j].neurons[i].out_weights.size(); l++){
 				if (j==0){ //input layer
-					sum_of_elems = sum_of_elems + net.layers[j].neurons[i].out_weights[l] * input[l];
+					sum_of_elems += net.layers[j].neurons[i].out_weights[l] * input[l];
 				}
 				else{ // hidden layers
-					sum_of_elems = sum_of_elems + net.layers[j].neurons[i].out_weights[l] * net.layers[j-1].neurons[l].x;
+					sum_of_elems += net.layers[j].neurons[i].out_weights[l] * net.layers[j-1].neurons[l].x;
 				}
 			}
 		
-			net.layers[j].neurons[i].s = sum_of_elems + net.layers[j].neurons[i].bias;
+			net.layers[j].neurons[i].s += net.layers[j].neurons[i].bias;
 			net.layers[j].neurons[i].x = sigma(net.layers[j].neurons[i].s);
 		}
 	}

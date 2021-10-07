@@ -228,14 +228,14 @@ void forward_prop(vector<float> input){
 			current_neuron = net.layers[j].neurons[i];
 			for(int l = 0; l<current_neuron.nb_weights; l++){
 				if (j==0){ //input layer
-					sum_of_elems = sum_of_elems + current_neuron.out_weights[l] * input[l];
+					sum_of_elems += current_neuron.out_weights[l] * input[l];
 				}
 				else{ // hidden layers
-					sum_of_elems = sum_of_elems + current_neuron.out_weights[l] * net.layers[j-1].neurons[l].x;
+					sum_of_elems += current_neuron.out_weights[l] * net.layers[j-1].neurons[l].x;
 				}
 			}
 		
-			current_neuron.s = sum_of_elems + current_neuron.bias;
+			current_neuron.s += current_neuron.bias;
 			current_neuron.x = sigma(current_neuron.s);
 			net.layers[j].neurons[i] = current_neuron;
 		}
