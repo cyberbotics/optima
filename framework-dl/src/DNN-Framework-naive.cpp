@@ -215,7 +215,7 @@ float MSEdLoss(float input, float target){
 
 void forward_prop(vector<float> input){
 	float sum_of_elems = 0.;
-
+	
 	for(int j = 0; j<net.nb_layers; j++){
 		//vector<float> hidden_x;
 		for(int i = 0; i<net.layers[j].size; i++){

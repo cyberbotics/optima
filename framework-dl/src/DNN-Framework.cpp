@@ -222,7 +222,6 @@ void forward_prop(vector<float> input){
 	Neuron current_neuron;
 
 	for(int j = 0; j<net.nb_layers; j++){
-		//vector<float> hidden_x;
 		for(int i = 0; i<net.layers[j].size; i++){
 			sum_of_elems = 0.;
 			current_neuron = net.layers[j].neurons[i];
