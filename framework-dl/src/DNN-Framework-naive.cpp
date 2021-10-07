@@ -1,7 +1,7 @@
 /**
  * Document: DNN-Framework-naive.cpp
  * Summary:
- *       Naive implementation of a Neural Net Framework for future DFE implementation
+ *       Naive implementation of a Neural Network Framework for future DFE implementation
  */
 
 #include <math.h>
@@ -49,50 +49,50 @@ class Neuron{
 		~Neuron(){};
 };
 
-class Linear{
+class LinearLayer{
 	public:
 		int size;
 		vector<Neuron> neurons;
 
-		Linear(){};
+		LinearLayer(){};
 
-		Linear(int s, int input_size){
+		LinearLayer(int s, int input_size){
 			size = s;
 			for (int i = 0; i < s; i++) {
 				neurons.push_back(Neuron(input_size));
 			}
 		};
 
-		~Linear(){};
+		~LinearLayer(){};
 
 };
 
-class Net{
+class Network{
 	public:
 		int nb_layers;
-		vector<Linear> layers;
+		vector<LinearLayer> layers;
 
-		Net(){};
+		Network(){};
 
-		Net(vector<Linear> ls, int size){
+		Network(vector<LinearLayer> ls, int size){
 			nb_layers = size;
 			for (int i = 0; i < size; i++) {
 				layers.push_back(ls[i]);
 			}
 		};
 
-		void setLayers(vector<Linear> ls, int size){
+		void setLayers(vector<LinearLayer> ls, int size){
 			nb_layers = size;
 			for (int i = 0; i < size; i++) {
 				layers.push_back(ls[i]);
 			}
 		}
 
-		~Net(){};
+		~Network(){};
 
 };
 
-Net net;
+Network net;
 
 vector<vector<float>> convert_labels(vector<u_int8_t> labels){
 	vector<vector<float>> converted_labels;
@@ -337,14 +337,14 @@ int main(void)
 	float perc_train_error = 0.;
 	float perc_test_error = 0.;
 
-	// Net creation
+	// Network creation
 	int hidden1 = 50;
 	int nb_layers = 2;
-	vector<Linear> net_layers;
+	vector<LinearLayer> net_layers;
 	vector<int> layer_size;
 	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
-		net_layers.push_back(Linear(layer_size[i],layer_size[i-1]));
+		net_layers.push_back(LinearLayer(layer_size[i],layer_size[i-1]));
 	}
 	net.setLayers(net_layers, nb_layers);
 
