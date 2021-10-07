@@ -35,7 +35,7 @@ class Neuron{
 		Neuron(int input_size){
 			random_device rd;
     		default_random_engine e1(rd());	
-			normal_distribution<float> normal(0.,1e-2);
+			normal_distribution<float> normal(0.,1e-6);
 			for (int i = 0; i < input_size; i++) { 
 				out_weights.push_back(normal(e1));
 				dw.push_back(0.);
@@ -342,7 +342,6 @@ int main(void)
 	// Training parameters
 	int nb_epochs = 2000;
 	float learning_rate = 0.1 / (float)nb_images;
-	int pred;
 	float acc_loss = 0.;
 	float prev_loss = 0.;
 	int nb_train_errors = 0;
@@ -353,10 +352,10 @@ int main(void)
 	// Net creation
 	int hidden1 = 50;
 	int hidden2 = 50;
-	int nb_layers = 3;
+	int nb_layers = 2;
 	vector<Linear> net_layers;
 	vector<int> layer_size;
-	layer_size.insert(layer_size.end(), { train_input_size, hidden1, hidden2, train_target_size} );
+	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
 		net_layers.push_back(Linear(layer_size[i],layer_size[i-1]));
 	}
