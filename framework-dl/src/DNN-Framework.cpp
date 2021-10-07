@@ -235,7 +235,7 @@ void forward_prop(vector<float> input){
 				}
 			}
 		
-			current_neuron.s += current_neuron.bias;
+			current_neuron.s = sum_of_elems + current_neuron.bias;
 			current_neuron.x = sigma(current_neuron.s);
 			net.layers[j].neurons[i] = current_neuron;
 		}

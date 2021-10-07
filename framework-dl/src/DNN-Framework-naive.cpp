@@ -229,7 +229,7 @@ void forward_prop(vector<float> input){
 				}
 			}
 		
-			net.layers[j].neurons[i].s += net.layers[j].neurons[i].bias;
+			net.layers[j].neurons[i].s = sum_of_elems + net.layers[j].neurons[i].bias;
 			net.layers[j].neurons[i].x = sigma(net.layers[j].neurons[i].s);
 		}
 	}
