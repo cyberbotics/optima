@@ -352,7 +352,6 @@ int main(void)
 	// Training
 	for(int e = 0; e < nb_epochs; e++){
 		
-
 		reset_gradients();
 		nb_train_errors = 0;
 		nb_test_errors = 0;

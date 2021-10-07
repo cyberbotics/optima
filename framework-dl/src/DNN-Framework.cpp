@@ -340,7 +340,7 @@ int main(void)
 	int train_target_size = train_target[0].size();
 
 	// Training parameters
-	int nb_epochs = 2000;
+	int nb_epochs = 10;
 	float learning_rate = 0.1 / (float)nb_images;
 	float acc_loss = 0.;
 	float prev_loss = 0.;
