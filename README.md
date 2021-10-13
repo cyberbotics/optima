@@ -22,4 +22,4 @@ cd framework-dl
 mkdir build
 make
 ```
-Then you can run the framework using `./build/DNN-framework`. You can choose any structure you want and it will train it on the MNIST dataset.
+Then you can run the framework using `./build/DNN-framework`. You can choose any structure you want and it will train your network on the MNIST dataset.
