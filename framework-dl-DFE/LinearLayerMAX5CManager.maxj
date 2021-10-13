@@ -1,0 +1,97 @@
+/**
+ * MaxFile name: LinearLayer
+ * Summary:
+ *     Manager for the linear layer kernel.
+ *   All IO is between the CPU and the DFE.
+ */
+
+package propagation;
+
+import com.maxeler.maxcompiler.v2.build.EngineParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFETypeFactory;
+import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceMath;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceParam;
+import com.maxeler.platform.max5.manager.MAX5CManager;
+import com.maxeler.platform.max5.manager.BuildConfig;
+import com.maxeler.platform.max5.manager.BuildConfig.Effort;
+
+
+public class LinearLayerMAX5CManager extends MAX5CManager {
+
+	 private final CPUTypes cpuT = CPUTypes.FLOAT;
+	 private final String KERNEL_NAME1 = "LINEAR_LAYER_KERNEL1";
+	 private final String KERNEL_NAME2 = "LINEAR_LAYER_KERNEL2";
+	 
+	 public LinearLayerMAX5CManager(EngineParameters params) {
+		super(params);
+
+		getCurrentKernelConfig().debug.setEnableLatencyAnnotation(true);
+		setAllowNonMultipleTransitions(true);
+		
+		Kernel kernel1 = new LinearLayerKernel(makeKernelParameters(KERNEL_NAME1));
+		Kernel kernel2 = new LinearLayerKernel(makeKernelParameters(KERNEL_NAME2));
+		KernelBlock kernelBlock1 = addKernel(kernel1);
+		KernelBlock kernelBlock2 = addKernel(kernel2);
+		kernelBlock1.getInput(LinearLayerKernel.IN_NAME) <== addStreamFromCPU("input");
+		kernelBlock1.getInput(LinearLayerKernel.W_NAME) <== addStreamFromCPU("weights1");
+		kernelBlock1.getInput(LinearLayerKernel.B_NAME) <== addStreamFromCPU("biases1");
+		kernelBlock2.getInput(LinearLayerKernel.IN_NAME) <== kernelBlock1.getOutput(LinearLayerKernel.OUT_NAME); // Link both kernels
+		kernelBlock2.getInput(LinearLayerKernel.W_NAME) <== addStreamFromCPU("weights2");
+		kernelBlock2.getInput(LinearLayerKernel.B_NAME) <== addStreamFromCPU("biases2");
+		addStreamToCPU("output") <== kernelBlock2.getOutput(LinearLayerKernel.OUT_NAME);
+	 }
+	
+	 public EngineInterface interfaceDefault() {
+		 EngineInterface ei = new EngineInterface();
+
+		 InterfaceParam BS = ei.addParam("BS", CPUTypes.INT64);  // batch size
+		 InterfaceParam IS1 = ei.addParam("IS1", CPUTypes.INT64);  // input size layer 1
+		 InterfaceParam OS1 = ei.addParam("OS1", CPUTypes.INT64);  // output size layer 1
+		 InterfaceParam IS2 = ei.addParam("IS2", CPUTypes.INT64);  // input size layer 2
+		 InterfaceParam OS2 = ei.addParam("OS2", CPUTypes.INT64);  // output size layer 2
+		 InterfaceParam L1 = ei.getAutoLoopOffset(KERNEL_NAME1, LinearLayerKernel.OFFSET); // automatic offset for layer 1
+		 InterfaceParam L2 = ei.getAutoLoopOffset(KERNEL_NAME2, LinearLayerKernel.OFFSET); // automatic offset for layer 2
+
+		 ei.setTicks(KERNEL_NAME1, IS1 * OS1 * L1 * BS);
+		 ei.setTicks(KERNEL_NAME2, IS2 * OS2 * L2 * BS);
+		 
+		 ei.setStream("input", cpuT, cpuT.sizeInBytes() * IS1 * BS);
+		 ei.setStream("weights1", cpuT, cpuT.sizeInBytes() * IS1 * OS1);
+		 ei.setStream("biases1", cpuT, cpuT.sizeInBytes() * OS1 * BS);
+		 ei.setStream("weights2", cpuT, cpuT.sizeInBytes() * IS2 * OS2);
+		 ei.setStream("biases2", cpuT, cpuT.sizeInBytes() * OS2 * BS);
+		 ei.setStream("output", cpuT, cpuT.sizeInBytes() * OS2 * BS);
+		 
+		 ei.setScalar(KERNEL_NAME1, LinearLayerKernel.INSIZE_NAME, IS1);
+		 ei.setScalar(KERNEL_NAME1, LinearLayerKernel.OUTSIZE_NAME, OS1);
+		 ei.setScalar(KERNEL_NAME1, LinearLayerKernel.BATCHSIZE_NAME, BS);
+		 ei.setScalar(KERNEL_NAME2, LinearLayerKernel.INSIZE_NAME, IS2);
+		 ei.setScalar(KERNEL_NAME2, LinearLayerKernel.OUTSIZE_NAME, OS2);
+		 ei.setScalar(KERNEL_NAME2, LinearLayerKernel.BATCHSIZE_NAME, BS);
+		 
+		 ei.ignoreAutoLoopOffset(KERNEL_NAME1, LinearLayerKernel.OFFSET);
+		 ei.ignoreAutoLoopOffset(KERNEL_NAME2, LinearLayerKernel.OFFSET);
+
+		 return ei;
+	 }
+	
+	
+
+	 public static void main(String[] args) {
+		EngineParameters params = new EngineParameters(args);
+	    LinearLayerMAX5CManager mgr = new LinearLayerMAX5CManager(params);
+	    mgr.createSLiCinterface(mgr.interfaceDefault());
+	    
+	    
+	    
+	    BuildConfig buildConfig = mgr.getBuildConfig();
+	    buildConfig.setBuildEffort(Effort.HIGH);
+
+	    mgr.build();
+	}
+}

@@ -1,0 +1,102 @@
+/**
+ * MaxFile name: LinearLayer
+ * Summary:
+ * 	 Forward propagation of 1 linear layer.
+ */
+
+package propagation;
+
+import utils.DotProductKernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Mem.RamWriteMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Stream.OffsetExpr;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.KernelMath;
+
+public class LinearLayerKernel extends Kernel {
+
+  public static final String IN_NAME = "input";
+  public static final String W_NAME = "weights";
+  public static final String B_NAME = "biases";
+  public static final String OUT_NAME = "output";
+  public static final String INSIZE_NAME = "insize";
+  public static final String OUTSIZE_NAME = "outsize";
+  public static final String BATCHSIZE_NAME = "batchsize";
+  public static final String OFFSET = "offset";
+
+
+  public LinearLayerKernel(KernelParameters p) {
+    super(p);
+    
+    DFEVectorType<DFEVar> floatVec = new DFEVectorType<DFEVar>(dfeFloat(8,24), 1);
+    
+    DFEVar insize = io.scalarInput(INSIZE_NAME, dfeUInt(20)); // input dim
+    DFEVar outsize = io.scalarInput(OUTSIZE_NAME, dfeUInt(20)); // output dim
+    DFEVar batchsize = io.scalarInput(BATCHSIZE_NAME, dfeUInt(20)); // batch size of the input
+    
+    OffsetExpr loopLatency = stream.makeOffsetAutoLoop(OFFSET);
+    DFEVar loopLatencyVal = loopLatency.getDFEVar(getKernel(), dfeUInt(32));	
+    
+    // Counter to loop over each batch, input and output
+    CounterChain chain = control.count.makeCounterChain();
+    DFEVar b = chain.addCounter(batchsize, 1);
+    DFEVar h = chain.addCounter(outsize, 1);
+    DFEVar w = chain.addCounter(insize, 1);
+    DFEVar l = chain.addCounter(loopLatencyVal, 1);
+ 
+    DFEVector<DFEVar> input = io.input(IN_NAME, floatVec, h.eq(0) & l.eq(0)); // Controlled input -> only when next output
+    DFEVector<DFEVar> weights = io.input(W_NAME, floatVec, b.eq(0) & l.eq(0)); // Controlled weights -> only at each batch
+    DFEVector<DFEVar> biases = io.input(B_NAME, floatVec, w.eq(0) & l.eq(0)); // Controlled biases -> At each new input
+    DFEVector<DFEVar> output = floatVec.newInstance(getKernel());
+    
+    Memory<DFEVector<DFEVar>> ibuf = mem.alloc(floatVec, 1024*1024);
+    DFEVector<DFEVar> port = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST); // Keeping input in memory because must be used for each output neuron, writing at each new input
+    
+    DFEVar wcount = h*insize + w;
+    
+    Memory<DFEVector<DFEVar>> wbuf = mem.alloc(floatVec, 1024*1024);
+    DFEVector<DFEVar> portw = wbuf.port(wcount, weights, b.eq(0), RamWriteMode.WRITE_FIRST); // Keeping weights in memory for each batch, writing furing first input only
+
+    // Performing Dot Product: input * weights
+	  DotProductKernel dp = new DotProductKernel(getKernel(), 1, dfeFloat(8,24));
+	  dp.setInputs(port, portw);
+	  DFEVar tmp = dp.getOutput();
+
+	  DFEVar carriedSum = dfeFloat(8,24).newInstance(this);
+    DFEVar sum = (w.eq(0)) ? constant.var(0).cast(dfeFloat(8,24)) : carriedSum;
+    DFEVar newSum = sum + tmp;	
+    carriedSum.connect(stream.offset(newSum, -loopLatency));
+    
+    DFEVar s = newSum+biases[0]; // Adding the bias
+    DFEVar x = tanh(s); // Applying the activation function
+	  output.connect(x);
+
+	  DFEVar ofmapEn = w.eq(insize - 1) & l.eq(loopLatencyVal - 1);	
+	
+    io.output(OUT_NAME, floatVec, ofmapEn).connect(output); // Controlled output -> only when new input
+  }
+  
+  public DFEVar tanh(DFEVar input) {
+      DFEVar x = input;
+      // Exp
+      optimization.pushPipeliningFactor(1.0);
+      DFEVar Exp2xPlus1 = KernelMath.exp(2*x, dfeFloat(8,24)) + 1.0;
+      // Div
+      optimization.pushPipeliningFactor(1.0);
+      DFEVar DivResult = 2.0 / Exp2xPlus1;
+      optimization.popPipeliningFactor();
+      // Sub
+      DFEVar Result = 1.0 - DivResult.cast(dfeFloat(8,24));
+      optimization.popPipeliningFactor();
+      return Result;
+  }
+
+}
+
