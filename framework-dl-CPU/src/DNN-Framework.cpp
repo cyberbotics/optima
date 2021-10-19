@@ -317,6 +317,25 @@ int verify_classification(){
 	return pred;
 }
 
+void save_weights(){
+	ofstream wfile;
+	ofstream bfile;
+	wfile.open ("model/weights.txt");
+	bfile.open ("model/biases.txt");
+
+	for(int i = 0; i < net.nb_layers; i++){
+		for(int j = 0; j< net.layers[i].size; j++){
+			for(int k = 0; k< net.layers[i].neurons[j].nb_weights; k++){
+				wfile << net.layers[i].neurons[j].out_weights[k] << "\n";
+			}
+			bfile << j << " " << net.layers[i].neurons[j].bias << "\n";			
+		}
+	}
+
+	bfile.close();
+	wfile.close();
+}
+
 int main(void)
 {		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
@@ -410,7 +429,7 @@ int main(void)
 
 		update_weights(learning_rate);
 
-		// Decreasing Learning rate if oscillation
+		// Decreasing learning rate if oscillation
 		if(prev_loss < acc_loss){
 			learning_rate *= 0.8;
 		}
@@ -427,6 +446,8 @@ int main(void)
 		printf("%% of train errors = %.1f%%\n", perc_train_error);
 		printf("%% of test errors = %.1f%%\n", perc_test_error);	
 	}
+
+	save_weights();
 
 	return 0;
 }
