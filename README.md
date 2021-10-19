@@ -3,6 +3,15 @@ The goal of the [OPTIMA project](https://optima-hpc.eu/project/) is to take adva
 
 In the context of Cyberbotics, the goal is to show that running a Webots robot simulation which uses deep learning in its controllers on FPGA-based systems is much faster than on CPU or GPU. This repository summarizes the work performed on the Jumax machine to adapt a deep-learning robot simulation for FPGA.
 
+## Cloning this repository
+
+When cloning this repository, don't forget to initialize the submodules.
+```
+git clone https://github.com/cyberbotics/optima.git
+git submodule update --init --recursive
+```
+
+
 ## Webots on Jumax
 To install Webots on Jumax, please refer to the 2 following pages: [get access to Jumax](https://github.com/cyberbotics/optima/wiki/Access-Jumax) and [compile Webots on Jumax](https://github.com/cyberbotics/optima/wiki/Compile-Webots-on-Jumax).
 
