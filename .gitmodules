@@ -1,3 +1,3 @@
 [submodule "framework-dl/src/mnist"]
-	path = framework-dl/src/mnist
+	path = framework-dl-CPU/src/mnist
 	url = https://github.com/wichtounet/mnist.git
