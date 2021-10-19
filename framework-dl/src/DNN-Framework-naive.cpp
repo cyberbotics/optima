@@ -14,6 +14,8 @@
 #include <algorithm>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
+#define BATCH_SIZE 6000
+
 using namespace std;
 
 class Neuron{
@@ -311,7 +313,7 @@ int main(void)
 	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
-	int desired_nb_images = 6000;
+	int desired_nb_images = BATCH_SIZE;
 
 	vector<vector<u_int8_t>> train_input_full= dataset.training_images;
 	vector<u_int8_t> train_target_full= dataset.training_labels;
@@ -336,13 +338,30 @@ int main(void)
 	int nb_test_errors = 0;
 	float perc_train_error = 0.;
 	float perc_test_error = 0.;
+	// Network parameters
+	int hidden = 50;
+	int nb_layers = 2;
+
+	// User input for structure
+	cout << "Number of hidden layers (excluding input and output): ";
+	cin >> nb_layers; 
+	
+	vector<int> layer_size;
+	layer_size.push_back(train_input_size);
+
+	for(int i = 0; i<nb_layers; i++){
+		cout << "Dimension of layer " << i << ": ";
+		cin >> hidden;
+		layer_size.push_back(hidden);
+	}
+	layer_size.push_back(train_target_size);
+	nb_layers++;
+
+	cout << "Number of epochs: ";
+	cin >> nb_epochs; 
 
 	// Network creation
-	int hidden1 = 50;
-	int nb_layers = 2;
 	vector<LinearLayer> net_layers;
-	vector<int> layer_size;
-	layer_size.insert(layer_size.end(), { train_input_size, hidden1, train_target_size} );
 	for(int i = 1; i< nb_layers+1;i++){
 		net_layers.push_back(LinearLayer(layer_size[i],layer_size[i-1]));
 	}
