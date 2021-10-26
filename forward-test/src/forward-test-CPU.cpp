@@ -19,7 +19,7 @@
 #include <omp.h>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 10000
+#define BATCH_SIZE 30000
 
 using namespace std;
 using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;	
@@ -307,7 +307,9 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-	#pragma omp parallel for lastprivate
+
+	#pragma omp parallel for reduction(+:nb_test_errors)
+
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
 		result = forward_prop(test_input[i]);
