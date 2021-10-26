@@ -220,13 +220,6 @@ PropResult forward_prop(vector<float> input){
 
 			curr_s.push_back(sum_of_elems + current_neuron.bias);
 			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
-
-			/*if(j == 1){
-				printf("%f\n", sigma(sum_of_elems + current_neuron.bias));
-			}*/
-			//current_neuron.s = sum_of_elems + current_neuron.bias;
-			//current_neuron.x = sigma(current_neuron.s);
-			//net.layers[j].neurons[i] = current_neuron;
 			
 		}
 
@@ -307,7 +300,6 @@ int main(void)
 	}
 	net.setLayers(net_layers, nb_layers);
 	
-
 	load_weights();
 	printf("Weights and biases successfully loaded !\n");
 
@@ -315,7 +307,7 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-	#pragma omp parallel for
+	#pragma omp parallel for lastprivate
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
 		result = forward_prop(test_input[i]);
