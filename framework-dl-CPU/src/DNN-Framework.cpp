@@ -328,7 +328,7 @@ void save_weights(){
 			for(int k = 0; k< net.layers[i].neurons[j].nb_weights; k++){
 				wfile << net.layers[i].neurons[j].out_weights[k] << "\n";
 			}
-			bfile << j << " " << net.layers[i].neurons[j].bias << "\n";			
+			bfile << net.layers[i].neurons[j].bias << "\n";			
 		}
 	}
 
@@ -369,7 +369,7 @@ int main(void)
 	float perc_train_error = 0.;
 	float perc_test_error = 0.;
 	// Network parameters
-	int hidden = 50;
+	int hidden = 48;
 	int nb_layers = 2;
 	
 	// User input for structure

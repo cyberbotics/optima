@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <sys/time.h>
 #include <sstream>
 #include <fstream>
 #include <vector>
@@ -225,6 +226,7 @@ int verify_classification(){
 	int pred;
 	for(int j = 0; j<net.layers[net.nb_layers-1].size; j++){
 		output_vector.push_back(net.layers[net.nb_layers-1].neurons[j].x);
+		//printf("%d  %f\n",j, output_vector[j]);
 	}
 	pred = max_element(output_vector.begin(),output_vector.end()) - output_vector.begin();
 
@@ -279,7 +281,7 @@ int main(void)
 	float perc_test_error = 0.;
 
 	// Network parameters
-	int hidden = 50;
+	int hidden = 64;
 	vector<int> layer_size = {test_input_size, hidden, test_target_size};
 
 	int nb_layers = layer_size.size() - 1;
@@ -294,11 +296,19 @@ int main(void)
 	load_weights();
 	printf("Weights and biases successfully loaded !\n");
 
+	float acc_time = 0;
 	for (int i = 0; i< nb_images; i++){
+		struct timeval start;
+		gettimeofday(&start, NULL);
 		forward_prop(test_input[i]);
+		struct timeval end;
+		gettimeofday(&end, NULL);
+		
+		acc_time += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
 		if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
 	}
 
+	printf ("%f seconds\n", acc_time);
 	
 	perc_test_error = 100*(float)nb_test_errors/ (float)nb_images;
 	printf("%% of test errors = %.1f%%\n", perc_test_error);	
