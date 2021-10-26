@@ -17,7 +17,7 @@
 #include <algorithm>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 60000
+#define BATCH_SIZE 60000	
 
 using namespace std;
 
@@ -297,16 +297,15 @@ int main(void)
 	printf("Weights and biases successfully loaded !\n");
 
 	float acc_time = 0;
+	struct timeval start;
+	gettimeofday(&start, NULL);
 	for (int i = 0; i< nb_images; i++){
-		struct timeval start;
-		gettimeofday(&start, NULL);
 		forward_prop(test_input[i]);
-		struct timeval end;
-		gettimeofday(&end, NULL);
-		
-		acc_time += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
 		if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
 	}
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
 
 	printf ("%f seconds\n", acc_time);
 	
