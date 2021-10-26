@@ -12,21 +12,22 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <tuple>
 #include <iterator>
 #include <random>
 #include <algorithm>
+#include <omp.h>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 60000	
+#define BATCH_SIZE 10000
 
 using namespace std;
+using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;	
 
 class Neuron{
 	public:
 		vector<float> out_weights;
-		float bias;
-		float x;
-		float s;	
+		float bias;	
 
 		vector<float> dw;
 		float dbias;
@@ -47,9 +48,7 @@ class Neuron{
 			}
 			bias = normal(e1);
 			dbias = 0.;
-			x = 0.;
 			dx = 0.;
-			s = 0.;
 			ds = 0.;
 
 			nb_weights = out_weights.size();
@@ -196,11 +195,17 @@ float sigma(float x){
 	return output;
 }
 
-void forward_prop(vector<float> input){
+PropResult forward_prop(vector<float> input){
 	float sum_of_elems = 0.;
 	Neuron current_neuron;
+	vector<vector<float>> s;
+	vector<vector<float>> x;
 
 	for(int j = 0; j<net.nb_layers; j++){
+		//printf("j = %d \n", j);
+		vector<float> curr_s;
+		vector<float> curr_x;
+
 		for(int i = 0; i<net.layers[j].size; i++){
 			sum_of_elems = 0.;
 			current_neuron = net.layers[j].neurons[i];
@@ -209,20 +214,39 @@ void forward_prop(vector<float> input){
 					sum_of_elems += current_neuron.out_weights[l] * input[l];
 				}
 				else{ // hidden layers
-					sum_of_elems += current_neuron.out_weights[l] * net.layers[j-1].neurons[l].x;
+					sum_of_elems += current_neuron.out_weights[l] * x[j-1][l];
 				}
 			}
-		
-			current_neuron.s = sum_of_elems + current_neuron.bias;
-			current_neuron.x = sigma(current_neuron.s);
-			net.layers[j].neurons[i] = current_neuron;
+
+			curr_s.push_back(sum_of_elems + current_neuron.bias);
+			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
+
+			/*if(j == 1){
+				printf("%f\n", sigma(sum_of_elems + current_neuron.bias));
+			}*/
+			//current_neuron.s = sum_of_elems + current_neuron.bias;
+			//current_neuron.x = sigma(current_neuron.s);
+			//net.layers[j].neurons[i] = current_neuron;
+			
 		}
+
+		s.push_back(curr_s);
+		x.push_back(curr_x);
 	}
+
+	PropResult result;
+	result = make_tuple(s,x);
+
+	return result;
 }
 
 
-int verify_classification(){
-	vector<float> output_vector;
+int verify_classification(vector<float> result){
+	int pred;
+	pred = max_element(result.begin(),result.end()) - result.begin();
+	return pred;
+	
+	/*vector<float> output_vector;
 	int pred;
 	for(int j = 0; j<net.layers[net.nb_layers-1].size; j++){
 		output_vector.push_back(net.layers[net.nb_layers-1].neurons[j].x);
@@ -230,7 +254,7 @@ int verify_classification(){
 	}
 	pred = max_element(output_vector.begin(),output_vector.end()) - output_vector.begin();
 
-	return pred;
+	return pred;*/
 }
 
 void load_weights(){
@@ -293,16 +317,25 @@ int main(void)
 	}
 	net.setLayers(net_layers, nb_layers);
 	
+
 	load_weights();
 	printf("Weights and biases successfully loaded !\n");
 
 	float acc_time = 0;
 	struct timeval start;
 	gettimeofday(&start, NULL);
+
+	#pragma omp parallel for
 	for (int i = 0; i< nb_images; i++){
-		forward_prop(test_input[i]);
-		if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
+		//printf("%f\n", net.layers[0].neurons[0].out_weights[0]);
+		PropResult result;
+		result = forward_prop(test_input[i]);
+		//printf("%d\n", i);
+		//if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
+
+		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
+	
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
