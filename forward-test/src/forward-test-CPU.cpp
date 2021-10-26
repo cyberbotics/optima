@@ -220,13 +220,6 @@ PropResult forward_prop(vector<float> input){
 
 			curr_s.push_back(sum_of_elems + current_neuron.bias);
 			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
-
-			/*if(j == 1){
-				printf("%f\n", sigma(sum_of_elems + current_neuron.bias));
-			}*/
-			//current_neuron.s = sum_of_elems + current_neuron.bias;
-			//current_neuron.x = sigma(current_neuron.s);
-			//net.layers[j].neurons[i] = current_neuron;
 			
 		}
 
@@ -245,16 +238,6 @@ int verify_classification(vector<float> result){
 	int pred;
 	pred = max_element(result.begin(),result.end()) - result.begin();
 	return pred;
-	
-	/*vector<float> output_vector;
-	int pred;
-	for(int j = 0; j<net.layers[net.nb_layers-1].size; j++){
-		output_vector.push_back(net.layers[net.nb_layers-1].neurons[j].x);
-		//printf("%d  %f\n",j, output_vector[j]);
-	}
-	pred = max_element(output_vector.begin(),output_vector.end()) - output_vector.begin();
-
-	return pred;*/
 }
 
 void load_weights(){
@@ -317,7 +300,6 @@ int main(void)
 	}
 	net.setLayers(net_layers, nb_layers);
 	
-
 	load_weights();
 	printf("Weights and biases successfully loaded !\n");
 
@@ -325,13 +307,12 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
+
 	#pragma omp parallel for reduction(+:nb_test_errors)
+
 	for (int i = 0; i< nb_images; i++){
-		//printf("%f\n", net.layers[0].neurons[0].out_weights[0]);
 		PropResult result;
 		result = forward_prop(test_input[i]);
-		//printf("%d\n", i);
-		//if (test_target[i][verify_classification()] < 0.5){nb_test_errors++;}
 
 		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
