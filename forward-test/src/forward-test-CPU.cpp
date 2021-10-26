@@ -261,7 +261,7 @@ void load_weights(){
 int main(void)
 {		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	const string& folder = "mnist";	
+	const string& folder = "src/mnist";	
 	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
