@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <sys/time.h>
 #include <vector>
 #include <tuple>
 #include <iterator>
@@ -20,10 +21,13 @@
 #include <MaxSLiCInterface.h>
 #include "ForwardProp.h"
 
-#define BATCH_SIZE 60000
+#define BATCH_SIZE 96
 
 using namespace std;
 using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;
+
+const int inVecSize[] = {28,32};
+const int outVecSize[] = {8,1};
 
 class Neuron{
 	public:
@@ -106,6 +110,14 @@ class Network{
 };
 
 Network net;
+template<typename T>
+vector<T> flatten(const vector<vector<T>> &orig)
+{
+    vector<T> ret;
+    for(const auto &v: orig)
+        ret.insert(ret.end(), v.begin(), v.end());
+    return ret;
+}
 
 vector<vector<float>> convert_labels(vector<u_int8_t> labels){
 	vector<vector<float>> converted_labels;
@@ -202,6 +214,7 @@ PropResult forward_prop_dfe(vector<vector<float>> input, int batch_size){
 	vector<vector<float>> allWeights;
 	vector<vector<float>> allBiases;
 
+	/*
 	for(int i = 0; i<net.nb_layers; i++){
 
 		vector<vector<float>> weights;
@@ -223,6 +236,38 @@ PropResult forward_prop_dfe(vector<vector<float>> input, int batch_size){
 
 		allBiases.push_back(biases);
 
+	}*/
+
+	int wXVec[] = {input[0].size()/inVecSize[0], net.layers[0].size/inVecSize[1]};
+	//printf("%d, %d\n", wXVec[0], wXVec[1]);
+	// Organize weights
+	for(int l = 0; l< net.nb_layers; l++){
+		vector<float> weights;
+		for(int b = 0; b < net.layers[l].size/outVecSize[l]; b++){
+			for(int i = 0; i < wXVec[l]; i++){
+				for(int j = 0; j < outVecSize[l]; j++){
+					for(int k = 0; k < inVecSize[l]; k++) {
+						weights.push_back(net.layers[l].neurons[b*outVecSize[l]+j].out_weights[i*inVecSize[l]+k]);
+					}
+				}
+			}
+		}
+		allWeights.push_back(weights);
+	}
+
+	for(int i = 0; i<net.nb_layers; i++){
+
+		vector<float> bias;
+		vector<float> biases;
+		for(int j = 0; j<net.layers[i].size; j++){
+			bias.push_back(net.layers[i].neurons[j].bias);
+		}
+		for(int j = 0; j < batch_size; j++){
+			biases.insert(biases.end(), bias.begin(), bias.end());
+			//printf("biases %f\n", biases[j]);
+		}
+
+		allBiases.push_back(biases);
 	}
 
 	vector<float> s1(net.layers[0].size * batch_size);
@@ -249,7 +294,12 @@ PropResult forward_prop_dfe(vector<vector<float>> input, int batch_size){
 	actions.param_LS1 = net.layers[0].size;
 	actions.param_LS2 = net.layers[1].size;
 
+	struct timeval start;
+	gettimeofday(&start, NULL);
 	ForwardProp_run(max_engine, &actions);
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	printf ("%f seconds\n", (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6);
 
 	max_unload(max_engine);
 
@@ -277,8 +327,8 @@ int verify_classification(vector<float> result){
 void load_weights(){
 	string line;
 	float tmp;
-	fstream wfile("../framework-dl-CPU/model/weights.txt");
-	fstream bfile("../framework-dl-CPU/model/biases.txt");
+	fstream wfile("model/weights.txt");
+	fstream bfile("model/biases.txt");
 
 	for(int i = 0; i < net.nb_layers; i++){
 		for(int j = 0; j< net.layers[i].size; j++){
@@ -302,7 +352,7 @@ void load_weights(){
 int main(void)
 {		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	const string& folder = "mnist";	
+	const string& folder = "src/forward-test/mnist";
 	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
@@ -322,7 +372,7 @@ int main(void)
 	float perc_test_error = 0.;
 
 	// Network parameters
-	int hidden = 50;
+	int hidden = 64;
 	vector<int> layer_size = {test_input_size, hidden, test_target_size};
 
 	int nb_layers = layer_size.size() - 1;
@@ -343,6 +393,10 @@ int main(void)
 		vector<float>::const_iterator first = get<1>(result)[1].begin() + i * test_target_size;
 		vector<float>::const_iterator last = get<1>(result)[1].begin() + (i+1) * test_target_size;
 		vector<float> this_img_result(first, last);
+		/*for(int j = 0; j < test_target_size; j++){
+			printf("%d  %f\n",i*10+j, this_img_result[j]);
+		}*/
+
 		if (test_target[i][verify_classification(this_img_result)] < 0.5){nb_test_errors++;}
 	}
 	
