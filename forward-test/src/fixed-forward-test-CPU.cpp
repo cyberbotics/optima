@@ -19,20 +19,43 @@
 #include <omp.h>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 10000
+#define FIXED_POINT_FRACTIONAL_BITS 16
+#define BATCH_SIZE 30000
+
+typedef int32_t fixed_point_t;
 
 using namespace std;
-using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;	
+using PropResult = tuple<vector<vector<fixed_point_t>>, vector<vector<fixed_point_t>>>;	
+
+
+fixed_point_t float_to_fixedpt(float input)
+{
+    return (fixed_point_t)(round(input * (1 << FIXED_POINT_FRACTIONAL_BITS)));
+}
+
+fixed_point_t fixed_mul(fixed_point_t a, fixed_point_t b)
+{
+    fixed_point_t result;
+    int32_t temp;
+
+    temp = (int32_t)a * (int32_t)b;
+    
+    temp += (1 << (FIXED_POINT_FRACTIONAL_BITS - 1)); //round
+    
+    result = temp >> FIXED_POINT_FRACTIONAL_BITS; // divide by fractional bits
+
+    return result;
+}
 
 class Neuron{
 	public:
-		vector<float> out_weights;
-		float bias;	
+		vector<fixed_point_t> out_weights;
+		fixed_point_t bias;	
 
-		vector<float> dw;
-		float dbias;
-		float dx;
-		float ds;
+		vector<fixed_point_t> dw;
+		fixed_point_t dbias;
+		fixed_point_t dx;
+		fixed_point_t ds;
 
 		int nb_weights;
 
@@ -43,10 +66,10 @@ class Neuron{
     		default_random_engine e1(rd());	
 			normal_distribution<float> normal(0.,1e-6);
 			for (int i = 0; i < input_size; i++) { 
-				out_weights.push_back(normal(e1));
+				out_weights.push_back(float_to_fixedpt(normal(e1)));
 				dw.push_back(0.);
 			}
-			bias = normal(e1);
+			bias = float_to_fixedpt(normal(e1));
 			dbias = 0.;
 			dx = 0.;
 			ds = 0.;
@@ -186,35 +209,36 @@ vector<vector<float>> process_targets(vector<u_int8_t> targets_init, int desired
 	return converted_train_target;
 }
 
-float sigma(float x){	
-	float output = 0.;
+fixed_point_t sigma(fixed_point_t x){	
+	
+	fixed_point_t output = 0;
 	
 	//output = fmax(x,0.);
-	output = tanh(x);
+	output = float_to_fixedpt(tanh((float)x / (float)(1 << FIXED_POINT_FRACTIONAL_BITS)));
 
 	return output;
 }
 
-PropResult forward_prop(vector<float> input){
-	float sum_of_elems = 0.;
+PropResult forward_prop(vector<fixed_point_t> input){
+	fixed_point_t sum_of_elems = 0.;
 	Neuron current_neuron;
-	vector<vector<float>> s;
-	vector<vector<float>> x;
+	vector<vector<fixed_point_t>> s;
+	vector<vector<fixed_point_t>> x;
 
 	for(int j = 0; j<net.nb_layers; j++){
 		//printf("j = %d \n", j);
-		vector<float> curr_s;
-		vector<float> curr_x;
+		vector<fixed_point_t> curr_s;
+		vector<fixed_point_t> curr_x;
 
 		for(int i = 0; i<net.layers[j].size; i++){
 			sum_of_elems = 0.;
 			current_neuron = net.layers[j].neurons[i];
 			for(int l = 0; l<current_neuron.nb_weights; l++){
 				if (j==0){ //input layer
-					sum_of_elems += current_neuron.out_weights[l] * input[l];
+					sum_of_elems += fixed_mul(current_neuron.out_weights[l], input[l]);
 				}
 				else{ // hidden layers
-					sum_of_elems += current_neuron.out_weights[l] * x[j-1][l];
+					sum_of_elems += fixed_mul(current_neuron.out_weights[l], x[j-1][l]);
 				}
 			}
 
@@ -234,7 +258,7 @@ PropResult forward_prop(vector<float> input){
 }
 
 
-int verify_classification(vector<float> result){
+int verify_classification(vector<fixed_point_t> result){
 	int pred;
 	pred = max_element(result.begin(),result.end()) - result.begin();
 	return pred;
@@ -243,6 +267,7 @@ int verify_classification(vector<float> result){
 void load_weights(){
 	string line;
 	float tmp;
+	fixed_point_t tmpFixed;
 	fstream wfile("../framework-dl-CPU/model/weights.txt");
 	fstream bfile("../framework-dl-CPU/model/biases.txt");
 
@@ -252,12 +277,14 @@ void load_weights(){
 				getline(wfile, line);
 				stringstream ss(line);
 				ss >> tmp;
-				net.layers[i].neurons[j].out_weights[k] = tmp;
+				tmpFixed = float_to_fixedpt(tmp);
+				net.layers[i].neurons[j].out_weights[k] = tmpFixed;
 			}
 			getline(bfile,line);
 			stringstream ss(line);
 			ss >> tmp;
-			net.layers[i].neurons[j].bias = tmp;	
+			tmpFixed = float_to_fixedpt(tmp);
+			net.layers[i].neurons[j].bias = tmpFixed;	
 		}
 	}
 
@@ -277,8 +304,29 @@ int main(void)
 	vector<vector<u_int8_t>> test_input_full= dataset.training_images;
 	vector<u_int8_t> test_target_full= dataset.training_labels;
 
-	vector<vector<float>> test_input = process_images(test_input_full, desired_nb_images);
-	vector<vector<float>> test_target = process_targets(test_target_full, desired_nb_images);
+	vector<vector<float>> float_test_input = process_images(test_input_full, desired_nb_images);
+	vector<vector<float>> float_test_target = process_targets(test_target_full, desired_nb_images);
+
+	vector<vector<fixed_point_t>> test_input;
+	vector<vector<fixed_point_t>> test_target;
+	
+	for(int i = 0; i < float_test_input.size(); i++){
+		vector<fixed_point_t> curr_in;
+		for(int j = 0; j < float_test_input[0].size(); j++){
+			curr_in.push_back(float_to_fixedpt(float_test_input[i][j]));
+			
+		}
+		test_input.push_back(curr_in);
+	}
+	for(int i = 0; i < float_test_target.size(); i++){
+		vector<fixed_point_t> curr_tar;
+		for(int j = 0; j < float_test_target[0].size(); j++){
+			curr_tar.push_back(float_to_fixedpt(float_test_target[i][j]));
+			//printf("%d      ", float_to_fixedpt(float_test_target[i][j]));
+			//printf("%f      ", (float_test_target[i][j]));
+		}
+		test_target.push_back(curr_tar);
+	}
 
 	int nb_images = test_input.size();
 	int test_input_size = test_input[0].size();
@@ -313,10 +361,12 @@ int main(void)
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
 		result = forward_prop(test_input[i]);
-		
+		/*for(int j = 0; j < test_target_size; j++){
+			printf("%d  %f\n",i*10+j, (float)get<1>(result)[1][j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
+		}*/
 		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
-
+	printf("%d\n", nb_test_errors);
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
