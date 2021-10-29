@@ -1,4 +1,4 @@
-# optima
+# OPTIMA
 The goal of the [OPTIMA project](https://optima-hpc.eu/project/) is to take advantage of FPGA-based High Performance Computing (HPC) systems to optimize academic and industrial softwares and applications. It also aims at providing guidelines to ease future development of FPGA applications.
 
 In the context of Cyberbotics, the goal is to show that running a Webots robot simulation which uses deep learning in its controllers on FPGA-based systems is much faster than on CPU or GPU. This repository summarizes the work performed on the Jumax machine to adapt a deep-learning robot simulation for FPGA.
