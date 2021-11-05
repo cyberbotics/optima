@@ -1,5 +1,5 @@
 /**
- * MaxFile name: ForwardProp
+ * MaxFile name: BasicForwardProp
  * Summary:
  *     Manager for the forward propagation.
  *   All IO is between the CPU and the DFE.
@@ -9,8 +9,6 @@ package forward;
 
 import com.maxeler.maxcompiler.v2.build.EngineParameters;
 import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
-//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
-//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFETypeFactory;
 import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
 import com.maxeler.maxcompiler.v2.managers.custom.blocks.Fanout;
 import com.maxeler.maxcompiler.v2.managers.custom.DFELink;
@@ -115,12 +113,12 @@ public class ForwardPropBasicMAX5CManager extends MAX5CManager {
 
 	 public static void main(String[] args) {
 		EngineParameters params = new EngineParameters(args);
-	    ForwardPropBasicMAX5CManager mgr = new ForwardPropBasicMAX5CManager(params);
-	    mgr.createSLiCinterface(mgr.interfaceDefault());
-	    
-	    BuildConfig buildConfig = mgr.getBuildConfig();
-	    buildConfig.setBuildEffort(Effort.HIGH);
-
-	    mgr.build();
+		ForwardPropBasicMAX5CManager mgr = new ForwardPropBasicMAX5CManager(params);
+		mgr.createSLiCinterface(mgr.interfaceDefault());
+		
+		BuildConfig buildConfig = mgr.getBuildConfig();
+		buildConfig.setBuildEffort(Effort.HIGH);
+		
+		mgr.build();
 	}
 }
