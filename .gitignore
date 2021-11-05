@@ -5,4 +5,4 @@ build
 # IDE files
 .vscode
 
-forward-test/basic-forward-test-CPU/src/basic-forward-test/mnist
+
