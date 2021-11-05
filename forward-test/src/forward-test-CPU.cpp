@@ -307,7 +307,6 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-
 	#pragma omp parallel for reduction(+:nb_test_errors)
 
 	for (int i = 0; i< nb_images; i++){

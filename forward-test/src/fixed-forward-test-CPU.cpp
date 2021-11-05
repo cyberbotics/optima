@@ -22,7 +22,8 @@
 #define FIXED_POINT_FRACTIONAL_BITS 16
 #define BATCH_SIZE 10000
 
-typedef int32_t fixed_point_t;
+
+typedef int16_t fixed_point_t;
 
 using namespace std;
 using PropResult = tuple<vector<vector<fixed_point_t>>, vector<vector<fixed_point_t>>>;	
@@ -356,7 +357,8 @@ int main(void)
 	gettimeofday(&start, NULL);
 
 
-	//#pragma omp parallel for reduction(+:nb_test_errors)
+	#pragma omp parallel for reduction(+:nb_test_errors)
+
 
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
@@ -366,7 +368,7 @@ int main(void)
 		}*/
 		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
-	printf("%d\n", nb_test_errors);
+	//printf("%d\n", nb_test_errors);
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
