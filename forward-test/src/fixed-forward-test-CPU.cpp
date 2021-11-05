@@ -20,7 +20,7 @@
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
-#define BATCH_SIZE 30000
+#define BATCH_SIZE 10000
 
 typedef int32_t fixed_point_t;
 
@@ -356,7 +356,7 @@ int main(void)
 	gettimeofday(&start, NULL);
 
 
-	#pragma omp parallel for reduction(+:nb_test_errors)
+	//#pragma omp parallel for reduction(+:nb_test_errors)
 
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
