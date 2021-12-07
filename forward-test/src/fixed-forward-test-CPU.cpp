@@ -20,10 +20,10 @@
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
-#define BATCH_SIZE 10000
+#define BATCH_SIZE 1000
 
 
-typedef int16_t fixed_point_t;
+typedef int32_t fixed_point_t;
 
 using namespace std;
 using PropResult = tuple<vector<vector<fixed_point_t>>, vector<vector<fixed_point_t>>>;	
@@ -242,7 +242,9 @@ PropResult forward_prop(vector<fixed_point_t> input){
 					sum_of_elems += fixed_mul(current_neuron.out_weights[l], x[j-1][l]);
 				}
 			}
-
+			
+			//float snow = sum_of_elems + current_neuron.bias;
+			//printf("%f\n", (float)snow / (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
 			curr_s.push_back(sum_of_elems + current_neuron.bias);
 			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
 			
@@ -357,9 +359,7 @@ int main(void)
 	gettimeofday(&start, NULL);
 
 
-	#pragma omp parallel for reduction(+:nb_test_errors)
-
-
+	//#pragma omp parallel for reduction(+:nb_test_errors)
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
 		result = forward_prop(test_input[i]);
@@ -368,7 +368,7 @@ int main(void)
 		}*/
 		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
-	//printf("%d\n", nb_test_errors);
+	printf("%d\n", nb_test_errors);
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
