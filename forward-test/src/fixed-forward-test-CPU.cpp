@@ -20,10 +20,10 @@
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
-#define BATCH_SIZE 10000
+#define BATCH_SIZE 430
 
 
-typedef int16_t fixed_point_t;
+typedef int32_t fixed_point_t;
 
 using namespace std;
 using PropResult = tuple<vector<vector<fixed_point_t>>, vector<vector<fixed_point_t>>>;	
@@ -230,7 +230,7 @@ PropResult forward_prop(vector<fixed_point_t> input){
 		//printf("j = %d \n", j);
 		vector<fixed_point_t> curr_s;
 		vector<fixed_point_t> curr_x;
-
+		
 		for(int i = 0; i<net.layers[j].size; i++){
 			sum_of_elems = 0.;
 			current_neuron = net.layers[j].neurons[i];
@@ -317,7 +317,8 @@ int main(void)
 			curr_in.push_back(float_to_fixedpt(float_test_input[i][j]));
 			
 		}
-		test_input.push_back(curr_in);
+		for(int k = 0; k< 1; k++)
+			test_input.push_back(curr_in);
 	}
 	for(int i = 0; i < float_test_target.size(); i++){
 		vector<fixed_point_t> curr_tar;
@@ -326,9 +327,11 @@ int main(void)
 			//printf("%d      ", float_to_fixedpt(float_test_target[i][j]));
 			//printf("%f      ", (float_test_target[i][j]));
 		}
-		test_target.push_back(curr_tar);
+		for(int k = 0; k< 1; k++)
+			test_target.push_back(curr_tar);
 	}
-
+	
+	
 	int nb_images = test_input.size();
 	int test_input_size = test_input[0].size();
 	int test_target_size = test_target[0].size();
@@ -356,7 +359,7 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-
+	omp_set_num_threads(128);
 	#pragma omp parallel for reduction(+:nb_test_errors)
 
 
@@ -366,7 +369,7 @@ int main(void)
 		/*for(int j = 0; j < test_target_size; j++){
 			printf("%d  %f\n",i*10+j, (float)get<1>(result)[1][j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
 		}*/
-		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
+		//if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
 	//printf("%d\n", nb_test_errors);
 	struct timeval end;
