@@ -1,0 +1,9 @@
+#This file is overwritten if the project is imported in maxide
+CLASSPATH=${env.CLASSPATH}
+MAXCLASSPATH=${MaxCompiler_(version\:_default)}
+ECJJCP=${env.MAXCOMPILERDIR}/lib/ecj.jar
+MAXSOURCEDIRS=src
+MAXDESTDIR=bin
+javaVersionSource=1.8
+javaVersionTarget=1.8
+MaxCompiler_(version\:_default)=${env.MAXCOMPILERDIR}/lib/Max5Platform.jar\:${env.MAXCOMPILERDIR}/lib/Max4Platform.jar\:${env.MAXCOMPILERDIR}/lib/MaxCompiler.jar

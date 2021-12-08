@@ -1,0 +1,4 @@
+#Tue Dec 07 17:33:22 CET 2021
+manager=forward.ForwardPropFloatMAX5CManager
+jvmargs=-Xmx2G
+parameters=DFEModel\=MAIA maxFileName\=FloatForwardProp target\=DFE_SIM
