@@ -2,8 +2,8 @@
 	path = MLP-train-framework/src/mnist
 	url = https://github.com/wichtounet/mnist.git
 [submodule "forward-test/mnist"]
-	path = MLP-forward-CPU/src/mnist
+	path = MLP-forward/src/mnist
 	url = https://github.com/wichtounet/mnist
 [submodule "forward-test/basic-forward-test-CPU/src/basic-forward-test/mnist"]
-	path = MLP-forward-CPU/basic-forward-test-CPU/src/basic-forward-test/mnist
+	path = MLP-forward/basic-forward-test-CPU/src/basic-forward-test/mnist
 	url = https://github.com/wichtounet/mnist
