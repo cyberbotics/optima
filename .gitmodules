@@ -1,5 +1,5 @@
 [submodule "framework-dl/src/mnist"]
-	path = framework-dl-CPU/src/mnist
+	path = MLP-train-framework/src/mnist
 	url = https://github.com/wichtounet/mnist.git
 [submodule "forward-test/mnist"]
 	path = forward-test/src/mnist
