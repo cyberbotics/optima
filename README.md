@@ -25,10 +25,10 @@ To code your own applications on Jumax, these 2 pages explain the required workf
 ## Machine Learning Applications
 To use deep learning in simulation, the first step is to create a framework which allows to create neural networks. The details of its implementation in C++ is given here: [Creation of a Deep Learning Frameowrk in C++](https://github.com/cyberbotics/optima/wiki/Creation-of-a-Deep-Learning-Framework-in-CPP). 
 
-The source code of the implementation is located in the `framework-dl-CPU` directory. You can compile it using the following command
+The source code of the implementation is located in the `MLP-train-framework` directory. You can compile it using the following command
 ```
-cd framework-dl-CPU
+cd MLP-train-framework
 mkdir build
-make
+g++ -O3 -g -Imnist src/MLP-train-framework.cpp -o build/MLP-train-framework
 ```
-Then you can run the framework using `./build/DNN-framework`. You can choose any structure you want and it will train your network on the MNIST dataset.
+Then you can run the framework using `./build/MLP-train-framework`. You can choose any structure you want and it will train your network on the MNIST dataset.

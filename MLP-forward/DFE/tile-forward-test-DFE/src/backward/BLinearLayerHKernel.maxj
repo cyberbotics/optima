@@ -1,0 +1,131 @@
+/**
+ * MaxFile name: BLinearLayerH
+ * Summary:
+ * 	 Backward propagation of hidden layers.
+ */
+
+package backward;
+
+//import utils.DotProductKernel;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Mem.RamWriteMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Stream.OffsetExpr;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+//import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.KernelMath;
+
+public class BLinearLayerHKernel extends Kernel {
+
+	public static final String X_NAME = "x";
+	public static final String XPREV_NAME = "xprev";
+	public static final String S_NAME = "s";
+	public static final String DS_NAME = "ds";
+	public static final String DB_NAME = "db";
+	public static final String DW_NAME = "dw";
+	public static final String XSIZE_NAME = "xsize";
+	public static final String XPREVSIZE_NAME = "xprevsize";
+	public static final String BATCHSIZE_NAME = "batchsize";
+	public static final String OFFSET = "offset";
+	public static final int MEMORYFORSIZE = 16;
+
+	//private final DFEVectorType<DFEVar> parallelVec, soloVec;
+	  
+	public BLinearLayerHKernel(KernelParameters p) {
+		super(p);
+	    
+	    //this.parallelVec = new DFEVectorType<DFEVar>(dfeFloat(8,24), vecSize);
+	    //this.soloVec = new DFEVectorType<DFEVar>(dfeFloat(8,24), 1);
+	    
+	    DFEVar batchsize = io.scalarInput(BATCHSIZE_NAME, dfeUInt(MEMORYFORSIZE));
+	    DFEVar xprevsize = io.scalarInput(XPREVSIZE_NAME, dfeUInt(MEMORYFORSIZE));
+	    DFEVar xsize = io.scalarInput(XSIZE_NAME, dfeUInt(MEMORYFORSIZE));
+	    
+	    OffsetExpr loopLatency = stream.makeOffsetAutoLoop(OFFSET);
+	    DFEVar loopLatencyVal = loopLatency.getDFEVar(getKernel(), dfeUInt(32));	
+	    
+	    CounterChain chain = control.count.makeCounterChain();
+	    DFEVar b = chain.addCounter(batchsize, 1);
+	    DFEVar h = chain.addCounter(xsize, 1);
+	    DFEVar w = chain.addCounter(xprevsize, 1);
+	    DFEVar l = chain.addCounter(loopLatencyVal, 1);
+	    
+	    DFEVar x = io.input(X_NAME, dfeFloat(8,24), w.eq(0) & l.eq(0));
+	    DFEVar xprev = io.input(XPREV_NAME, dfeFloat(8,24), h.eq(0) & l.eq(0));
+	    DFEVar s = io.input(S_NAME, dfeFloat(8,24), w.eq(0)& l.eq(0));
+	    
+	    DFEVar dl_dw = dfeFloat(8,24).newInstance(getKernel());
+	    DFEVar dl_db = dfeFloat(8,24).newInstance(getKernel());
+	    
+	    DFEVar dl_dx = x;
+	    DFEVar dl_ds = dtanh(s) * dl_dx;
+	    dl_db = dl_ds;
+	    
+	    DFEVar dsEnable = w.eq(xprevsize - 1) & l.eq(loopLatencyVal - 1);
+	    io.output(DS_NAME, dl_ds, dfeFloat(8,24), dsEnable);
+	    
+	    // Save current dl_db to memory by adding dl_ds to previous one
+	    Memory<DFEVar> dbbuf = mem.alloc(dfeFloat(8,24), (int)Math.pow(2, MEMORYFORSIZE));
+	    DFEVar dbprev = dbbuf.read(h);
+	    dbbuf.write(h, stream.offset(dbprev,-loopLatency+1) + dl_ds, w.eq(xprevsize -1) & l.eq(loopLatencyVal - 1)); //offset on dbprev because latency in reading
+	    dl_db = dbprev + dl_ds;
+	    
+	    DFEVar dbEnable = w.eq(xprevsize - 1) /*& b.eq(batchsize -1)*/ & l.eq(loopLatencyVal - 1);
+	    io.output(DB_NAME, dl_db, dfeFloat(8,24), dbEnable);
+	    
+	    // Memory to keep xprev for each x
+	    Memory<DFEVar> xprevbuf = mem.alloc(dfeFloat(8,24), (int)Math.pow(2, MEMORYFORSIZE));
+	    DFEVar portxprev = xprevbuf.port(w, xprev, h.eq(0), RamWriteMode.WRITE_FIRST);
+	    
+	    // Save current dl_dw to memory by adding portxprev * dl_ds to previous one
+	    Memory<DFEVar> dwbuf = mem.alloc(dfeFloat(8,24), (int)Math.pow(2, MEMORYFORSIZE));
+	    DFEVar address = h*xprevsize +w;
+	    DFEVar dwprev = dwbuf.read(address);
+	    dwbuf.write(address, stream.offset(dwprev,-loopLatency+1) + portxprev * dl_ds, l.eq(loopLatencyVal - 1)); //offset on dbprev because latency in reading
+	    dl_dw = dwprev + portxprev * dl_ds;
+	    
+	    DFEVar dwEnable = b.eq(batchsize -1) & l.eq(loopLatencyVal - 1);
+	    io.output(DW_NAME, dl_dw, dfeFloat(8,24), dwEnable);
+	    
+	    /*xsize.simWatch("xsize");
+	    xprevsize.simWatch("xprevsize");
+	    batchsize.simWatch("batchsize");
+		b.simWatch("b");
+	    h.simWatch("h");
+	    w.simWatch("w");
+	    l.simWatch("l");
+		dl_dx.simWatch("dl_dx");
+		s.simWatch("s");
+		dl_ds.simWatch("dl_dso");
+		portxprev.simWatch("xprevport");
+	    dl_db.simWatch("db");
+		dl_dw.simWatch("dw");
+	    dbEnable.simWatch("dbEnable");
+	    dwEnable.simWatch("dwEnable"); */
+	}
+  
+	public DFEVar dtanh(DFEVar x) {
+      
+		DFEVar result = dfeFloat(8,24).newInstance(getKernel());
+	  
+		optimization.pushPipeliningFactor(1.0); 
+		DFEVar expxPlusExpMinusx = KernelMath.exp(x, dfeFloat(8,24)) + KernelMath.exp(-1.0*x, dfeFloat(8,24)) ;
+	      
+		optimization.pushPipeliningFactor(1.0);
+	    DFEVar powResult = expxPlusExpMinusx * expxPlusExpMinusx ;
+	    optimization.popPipeliningFactor();
+	      
+	    result = 4.0 / powResult;
+	    optimization.popPipeliningFactor();
+	
+	    return result;
+	}
+
+}
+
