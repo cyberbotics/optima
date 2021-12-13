@@ -23,7 +23,7 @@
 #include "../fixed-forward-test/mnist/include/mnist/mnist_reader.hpp"
 #include "FixedForwardProp.h"
 
-#define BATCH_SIZE 1000 // min 4 * numEngines * P
+#define BATCH_SIZE 1000 // minimum 4 * numEngines
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
 typedef int32_t fixed_point_t;
@@ -258,11 +258,6 @@ PropResult forward_prop_dfe(vector<vector<u_int8_t>> input, int batchSize){
 	vector<vector<fixed_point_t>> x1(numEngines, vector<fixed_point_t>(firstLayerSize * batchSize / numEngines));
 	vector<vector<fixed_point_t>> s2(numEngines, vector<fixed_point_t>(secondLayerSize * batchSize / numEngines));
 	vector<vector<fixed_point_t>> x2(numEngines, vector<fixed_point_t>(secondLayerSize * batchSize / numEngines));
-
-	printf("%d\n", allBiases[0].size());
-	for(int i = 0; i < 64; i++){
-		printf("%d\n", allBiases[0][i]);
-	}
 
 	printf("Setting actions!\n");
 	FixedForwardProp_actions_t actions[numEngines];
