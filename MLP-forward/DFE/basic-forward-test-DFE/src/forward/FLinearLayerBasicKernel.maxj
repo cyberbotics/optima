@@ -33,58 +33,58 @@ public class FLinearLayerBasicKernel extends Kernel {
 
   
 	public FLinearLayerBasicKernel(KernelParameters p, int nbWeights, int inputSize, int outputSize) {
-	    super(p);
-	    
-	    DFEVar inputDim = io.scalarInput(INSIZE_NAME, dfeUInt(MathUtils.bitsToAddress(inputSize+1))); 
-	    DFEVar outputDim = io.scalarInput(OUTSIZE_NAME, dfeUInt(MathUtils.bitsToAddress(outputSize+1))); 
-	    
-	    OffsetExpr loopLatency = stream.makeOffsetAutoLoop(OFFSET);
-	    DFEVar loopLatencyVal = loopLatency.getDFEVar(getKernel(), dfeUInt(32));
-	    
+		super(p);
+
+		DFEVar inputDim = io.scalarInput(INSIZE_NAME, dfeUInt(MathUtils.bitsToAddress(inputSize+1))); 
+		DFEVar outputDim = io.scalarInput(OUTSIZE_NAME, dfeUInt(MathUtils.bitsToAddress(outputSize+1))); 
+
+		OffsetExpr loopLatency = stream.makeOffsetAutoLoop(OFFSET);
+		DFEVar loopLatencyVal = loopLatency.getDFEVar(getKernel(), dfeUInt(32));
+
 		Params wCounterParams = control.count.makeParams (MathUtils.bitsToAddress(nbWeights) + 1).withMax(nbWeights).withWrapMode(WrapMode.STOP_AT_MAX);
 		Counter wCounter = control.count.makeCounter(wCounterParams);
 		DFEVar readingW = wCounter.getCount() < nbWeights ? constant.var(true) : constant.var(false);
-	    
-	    CounterChain chain = control.count.makeCounterChain(~readingW);
-	    DFEVar h = chain.addCounter(outputDim, 1);
-	    DFEVar w = chain.addCounter(inputDim, 1);
-	    DFEVar l = chain.addCounter(loopLatencyVal, 1);
-	 
-	    DFEVar input = io.input(IN_NAME, dfeFloat(8,24), ~readingW & h.eq(0) & l.eq(0));
-	    DFEVar weights = io.input(W_NAME, dfeFloat(8,24), readingW);
-	    DFEVar biases = io.input(B_NAME, dfeFloat(8,24), ~readingW & w.eq(0) & l.eq(0));
-	    DFEVar s = dfeFloat(8,24).newInstance(getKernel());
-	    DFEVar x = dfeFloat(8,24).newInstance(getKernel());
-	    
-	    // Write weights to the memory
+
+		CounterChain chain = control.count.makeCounterChain(~readingW);
+		DFEVar h = chain.addCounter(outputDim, 1);
+		DFEVar w = chain.addCounter(inputDim, 1);
+		DFEVar l = chain.addCounter(loopLatencyVal, 1);
+
+		DFEVar input = io.input(IN_NAME, dfeFloat(8,24), ~readingW & h.eq(0) & l.eq(0));
+		DFEVar weights = io.input(W_NAME, dfeFloat(8,24), readingW);
+		DFEVar biases = io.input(B_NAME, dfeFloat(8,24), ~readingW & w.eq(0) & l.eq(0));
+		DFEVar s = dfeFloat(8,24).newInstance(getKernel());
+		DFEVar x = dfeFloat(8,24).newInstance(getKernel());
+
+		// Write weights to the memory
 		Memory<DFEVar> wMem = mem.alloc(dfeFloat(8,24), nbWeights);
 		wMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbWeights))), weights, readingW);
-	
+
 		// Write each input vector to the memory (multiple dot product with diff weights)
 		Memory<DFEVar> ibuf = mem.alloc(dfeFloat(8,24), inputSize+1);
-		DFEVar port = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);
-		
+		DFEVar inPort = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);
+
 		DFEVar wcount = h.cast(dfeUInt(32)) * inputDim.cast(dfeUInt(32)) + w.cast(dfeUInt(32));
-		
+
 		// Read correct weight chunk in memory
 		DFEVar coeff = wMem.read(wcount.cast(dfeUInt(MathUtils.bitsToAddress(nbWeights))));
-		
+
 		// Perform dot product between input and weights vector
-		DFEVar tmp = port * coeff;
-		
+		DFEVar tmp = inPort * coeff;
+
 		// Add all corresponding dot products together
 		DFEVar carriedSum = dfeFloat(8,24).newInstance(this);
 		DFEVar sum = (w.eq(0)) ? constant.var(0).cast(dfeFloat(8,24)) : carriedSum;
 		DFEVar newSum = sum + tmp;	
 		carriedSum.connect(stream.offset(newSum, -loopLatency));
-		
+
 		// Add corresponding bias and apply activation function
 		s = newSum + biases;
 		x = tanh(s);
-		
+
 		// Only enable output when all operations have been done for 1 input vector
 		DFEVar outEnable = w.eq(inputDim - 1) & l.eq(loopLatencyVal - 1);	
-		
+
 		io.output(S_NAME, s, dfeFloat(8,24), outEnable);
 		io.output(X_NAME, x, dfeFloat(8,24), outEnable);
 		
