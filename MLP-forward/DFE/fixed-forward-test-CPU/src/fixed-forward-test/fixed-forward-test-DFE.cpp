@@ -1,5 +1,4 @@
 /**
- * Document: forward-test-DFE.cpp
  * Summary:
  *        Test speed of forward propagation on DFE
  */

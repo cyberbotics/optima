@@ -1,5 +1,4 @@
 /**
- * Document: float-forward-test-DFE.cpp
  * Summary:
  *        Test speed of floating point forward propagation on DFE
  */

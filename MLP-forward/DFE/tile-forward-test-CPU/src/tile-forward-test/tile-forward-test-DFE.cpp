@@ -1,5 +1,4 @@
 /**
- * Document: tile-forward-test-DFE.cpp
  * Summary:
  *        Test speed of forward propagation with loop-tiling on DFE
  */
