@@ -11,7 +11,7 @@ MAXOBJDIR := $(OBJDIR)/max
 CFLAGS := -O3 -fPIC -std=c++11 -Wall -Wextra
 LFLAGS :=
 
-EXE := fixed8-forward-test
+EXE := fixed-forward-test
 SONAME := lib$(shell echo $EXE | tr '[:upper:]' '[:lower:]').so
 
 TRIMMEDUSER := $(shell echo $(USER) | head -c 10)

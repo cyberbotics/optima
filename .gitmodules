@@ -14,5 +14,5 @@
 	path = MLP-forward/DFE/float-forward-test-CPU/src/float-forward-test/mnist
 	url = https://github.com/wichtounet/mnist
 [submodule "MLP-forward/DFE/fixed-forward-test-CPU/src/fixed8-forward-test/mnist"]
-	path = MLP-forward/DFE/fixed-forward-test-CPU/src/fixed8-forward-test/mnist
+	path = MLP-forward/DFE/fixed-forward-test-CPU/src/fixed-forward-test/mnist
 	url = https://github.com/wichtounet/mnist.git
