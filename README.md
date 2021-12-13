@@ -22,8 +22,9 @@ To understand how DFEs (running the FPGAs) on Jumax work, please head to the fol
 
 To code your own applications on Jumax, these 2 pages explain the required workflow: [start MaxIDE](https://github.com/cyberbotics/optima/wiki/Start-MaxIDE) and [compile with MaxCompiler](https://github.com/cyberbotics/optima/wiki/Compile-with-MaxCompiler)
 
+
 ## Multilayers Perceptrons (MLP) framework
-The first step consists in creating a framework which allows to create simple neural networks: multilayers perceptrons. The details of its implementation in C++ is given here: [Creation of a Deep Learning Frameowrk in C++](https://github.com/cyberbotics/optima/wiki/Creation-of-a-MLP-Deep-Learning-Framework-in-CPP). 
+The first contribution consists in creating a framework which allows to create simple neural networks: multilayers perceptrons. The details of its implementation in C++ is given here: [Creation of a Deep Learning Frameowrk in C++](https://github.com/cyberbotics/optima/wiki/Creation-of-a-MLP-Deep-Learning-Framework-in-CPP). 
 
 The source code of the implementation is located in the `MLP-train-framework` directory. You can compile it using the following command
 ```
