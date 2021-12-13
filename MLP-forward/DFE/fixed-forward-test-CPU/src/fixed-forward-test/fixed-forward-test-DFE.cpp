@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <MaxSLiCInterface.h>
 
-#include "../fixed8-forward-test/mnist/include/mnist/mnist_reader.hpp"
+#include "../fixed-forward-test/mnist/include/mnist/mnist_reader.hpp"
 #include "FixedForwardProp.h"
 
 #define BATCH_SIZE 1000 // min 4 * numEngines * P
@@ -327,7 +327,7 @@ PropResult forward_prop_dfe(vector<vector<u_int8_t>> input, int batchSize){
 	gettimeofday(&end, NULL);
 	printf ("%f seconds\n", (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6);*/
 
-	printf("Unloading %d engine!\n", numEngines);
+	printf("Unloading %d engine(s)!\n", numEngines);
 	for(int i = 0; i < numEngines; i++){
 		max_unload(max_engines[i]);
 	}
@@ -357,7 +357,7 @@ int verify_classification(vector<fixed_point_t> result){
 int main(void)
 {		
 	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	const string& folder = "src/fixed8-forward-test/mnist";
+	const string& folder = "src/fixed-forward-test/mnist";
 	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
 
 	// Process input data and labels
@@ -405,14 +405,6 @@ int main(void)
 
 		/*for(int j = 0; j < test_target_size; j++){
 			printf("%d  %f\n",i*10+j, (float)this_img_result[j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
-		}*/
-
-		/*vector<fixed_point_t>::const_iterator first = get<0>(result)[0].begin() + i * (64);
-		vector<fixed_point_t>::const_iterator last = get<0>(result)[0].begin() + (i+1) * (64);
-		vector<fixed_point_t> this_img_result(first, last);
-
-		for(int j = 0; j < 64; j++){
-			printf("%d  %f\n",i*64+j, (float)this_img_result[j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
 		}*/
 
 		if (test_target[i][verify_classification(this_img_result)] < 0.5){nb_test_errors++;}
