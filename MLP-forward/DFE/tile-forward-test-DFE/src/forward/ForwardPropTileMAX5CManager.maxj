@@ -1,5 +1,5 @@
 /**
- * MaxFile name: ForwardPropTile
+ * MaxFile name: TileForwardProp
  * Summary:
  *     Manager for the forward propagation.
  *   All IO is between the CPU and the DFE.
@@ -9,8 +9,6 @@ package forward;
 
 import com.maxeler.maxcompiler.v2.build.EngineParameters;
 import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
-//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
-//import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFETypeFactory;
 import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
 import com.maxeler.maxcompiler.v2.managers.custom.blocks.Fanout;
 import com.maxeler.maxcompiler.v2.managers.custom.DFELink;
@@ -25,62 +23,60 @@ import com.maxeler.platform.max5.manager.BuildConfig.Effort;
 
 public class ForwardPropTileMAX5CManager extends MAX5CManager {
 
-	 private final CPUTypes cpuT = CPUTypes.FLOAT;
-	 private final String KERNEL_NAME1 = "FHIDDENLAYER_KERNEL";
-	 private final String KERNEL_NAME2 = "FOUTPUTLAYER_KERNEL";
-	 private static final int SIZE_LAYER_0 = 784;
-	 private static final int SIZE_LAYER_1 = 64;
-	 private static final int SIZE_LAYER_2 = 12;
+	private final CPUTypes cpuT = CPUTypes.FLOAT;
+	private final String KERNEL_NAME1 = "FHIDDENLAYER_KERNEL";
+	private final String KERNEL_NAME2 = "FOUTPUTLAYER_KERNEL";
+	private static final int SIZE_LAYER_0 = 784;
+	private static final int SIZE_LAYER_1 = 64;
+	private static final int SIZE_LAYER_2 = 12;
+
+	private static final int IN_VEC_SIZE1 = 28;		
+	private static final int IN_VEC_SIZE2 = 32;
+	private static final int TILE_OFFSET1 = 16;
+	private static final int TILE_OFFSET2 = 12;
+
+	private final int wNbVec1;
+	private final int wNbVec2;
+	private final int inNbVec1;
+	private final int inNbVec2;
+	private final int outNbBlock1;
+	private final int outNbBlock2;
 	 
-	 private static final int IN_VEC_SIZE1 = 28;		
-	 private static final int IN_VEC_SIZE2 = 32;
-	 private static final int TILE_OFFSET1 = 16;
-	 private static final int TILE_OFFSET2 = 12;
-	 
-	 //private static final int PADDING = 2;
-	 
-	 private final int wNbVec1;
-	 private final int wNbVec2;
-	 private final int inNbVec1;
-	 private final int inNbVec2;
-	 private final int outNbBlock1;
-	 private final int outNbBlock2;
-	 
-	 public ForwardPropTileMAX5CManager(EngineParameters params) {
+	public ForwardPropTileMAX5CManager(EngineParameters params) {
 		super(params);
 
 		getCurrentKernelConfig().debug.setEnableLatencyAnnotation(true);
 		setAllowNonMultipleTransitions(true);
-		
+
 		this.wNbVec1 = SIZE_LAYER_0*SIZE_LAYER_1/IN_VEC_SIZE1;
 		this.wNbVec2 = SIZE_LAYER_1*SIZE_LAYER_2/IN_VEC_SIZE2;
 		this.inNbVec1 = SIZE_LAYER_0/IN_VEC_SIZE1;
 		this.inNbVec2 = SIZE_LAYER_1/IN_VEC_SIZE2;
 		this.outNbBlock1 = SIZE_LAYER_1/TILE_OFFSET1;
 		this.outNbBlock2 = SIZE_LAYER_2/TILE_OFFSET2;
-		
+
 		Kernel kernel1 = new FLinearLayerTileKernel(makeKernelParameters(KERNEL_NAME1), IN_VEC_SIZE1, this.wNbVec1, SIZE_LAYER_1, this.inNbVec1, this.outNbBlock1, TILE_OFFSET1);
 		Kernel kernel2 = new FLinearLayerTileKernel(makeKernelParameters(KERNEL_NAME2), IN_VEC_SIZE2, this.wNbVec2, SIZE_LAYER_2, this.inNbVec2, this.outNbBlock2, TILE_OFFSET2);
 		KernelBlock kernelBlock1 = addKernel(kernel1);
 		KernelBlock kernelBlock2 = addKernel(kernel2);
-		
+
 		kernelBlock1.getInput(FLinearLayerTileKernel.IN_NAME) <== addStreamFromCPU("input");
 		kernelBlock1.getInput(FLinearLayerTileKernel.W_NAME) <== addStreamFromCPU("weights1");
 		kernelBlock1.getInput(FLinearLayerTileKernel.B_NAME) <== addStreamFromCPU("biases1");
-		
+
 		addStreamToCPU("s1") <== kernelBlock1.getOutput(FLinearLayerFloatKernel.S_NAME);
 		Fanout x1Fanout = fanout("x1Fanout"); //Redirect output to CPU and 2nd kernel with a fanout
 		x1Fanout.getInput() <== kernelBlock1.getOutput(FLinearLayerTileKernel.X_NAME);
-		
+
 		addStreamToCPU("x1") <== x1Fanout.addOutput("x11");
-		
+
 		kernelBlock2.getInput(FLinearLayerTileKernel.IN_NAME) <== x1Fanout.addOutput("x12"); 
 		kernelBlock2.getInput(FLinearLayerTileKernel.W_NAME) <== addStreamFromCPU("weights2");
 		kernelBlock2.getInput(FLinearLayerTileKernel.B_NAME) <== addStreamFromCPU("biases2");
-		
+
 		addStreamToCPU("s2") <== kernelBlock2.getOutput(FLinearLayerTileKernel.S_NAME);
 		addStreamToCPU("x2") <== kernelBlock2.getOutput(FLinearLayerTileKernel.X_NAME);
-		
+
 		addMaxFileConstant("SIZE_LAYER_0", SIZE_LAYER_0);
 		addMaxFileConstant("SIZE_LAYER_1", SIZE_LAYER_1);
 		addMaxFileConstant("SIZE_LAYER_2", SIZE_LAYER_2);
@@ -88,48 +84,46 @@ public class ForwardPropTileMAX5CManager extends MAX5CManager {
 		addMaxFileConstant("IN_VEC_SIZE2", IN_VEC_SIZE2);
 		addMaxFileConstant("TILE_OFFSET1", TILE_OFFSET1);
 		addMaxFileConstant("TILE_OFFSET2", TILE_OFFSET2);
-	 }
+	}
 	
-	 public EngineInterface interfaceDefault() {
-		 EngineInterface ei = new EngineInterface();
+	public EngineInterface interfaceDefault() {
+		EngineInterface ei = new EngineInterface();
 
-		 InterfaceParam BS = ei.addParam("BS", CPUTypes.INT64);  // batch size
-		 InterfaceParam inNbVec1 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_0) / ei.addConstant((double)IN_VEC_SIZE1)).cast(CPUTypes.UINT32);
-		 InterfaceParam inNbVec2 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_1) / ei.addConstant((double)IN_VEC_SIZE2)).cast(CPUTypes.UINT32);
-		 InterfaceParam outNbVec1 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_1) / ei.addConstant((double)TILE_OFFSET1)).cast(CPUTypes.UINT32);
-		 InterfaceParam outNbVec2 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_2) / ei.addConstant((double)TILE_OFFSET2)).cast(CPUTypes.UINT32);
-		 
-		 ei.setTicks(KERNEL_NAME1, inNbVec1 * SIZE_LAYER_1 * BS + inNbVec1 * SIZE_LAYER_1);
-		 ei.setTicks(KERNEL_NAME2, inNbVec2 * SIZE_LAYER_2 * BS + inNbVec2 * SIZE_LAYER_2);
-		 
-		 ei.setStream("input", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_0 * BS);
-		 ei.setStream("weights1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_0 * SIZE_LAYER_1);
-		 ei.setStream("biases1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1);
-		 ei.setStream("s1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * BS);
-		 ei.setStream("x1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * BS);
-		 ei.setStream("weights2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * SIZE_LAYER_2);
-		 ei.setStream("biases2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2);
-		 ei.setStream("s2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2 * BS);
-		 ei.setStream("x2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2 * BS);
-		 
-		 ei.setScalar(KERNEL_NAME1, FLinearLayerTileKernel.INNBVEC_NAME, inNbVec1);
-		 ei.setScalar(KERNEL_NAME1, FLinearLayerTileKernel.OUTNBBLOCK_NAME, outNbVec1);
-		 ei.setScalar(KERNEL_NAME2, FLinearLayerTileKernel.INNBVEC_NAME, inNbVec2);
-		 ei.setScalar(KERNEL_NAME2, FLinearLayerTileKernel.OUTNBBLOCK_NAME, outNbVec2);
+		InterfaceParam BS = ei.addParam("BS", CPUTypes.INT64);  // batch size
+		InterfaceParam inNbVec1 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_0) / ei.addConstant((double)IN_VEC_SIZE1)).cast(CPUTypes.UINT32);
+		InterfaceParam inNbVec2 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_1) / ei.addConstant((double)IN_VEC_SIZE2)).cast(CPUTypes.UINT32);
+		InterfaceParam outNbVec1 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_1) / ei.addConstant((double)TILE_OFFSET1)).cast(CPUTypes.UINT32);
+		InterfaceParam outNbVec2 = InterfaceMath.ceil(ei.addConstant((double)SIZE_LAYER_2) / ei.addConstant((double)TILE_OFFSET2)).cast(CPUTypes.UINT32);
 
-		 return ei;
-	 }
+		ei.setTicks(KERNEL_NAME1, inNbVec1 * SIZE_LAYER_1 * BS + inNbVec1 * SIZE_LAYER_1);
+		ei.setTicks(KERNEL_NAME2, inNbVec2 * SIZE_LAYER_2 * BS + inNbVec2 * SIZE_LAYER_2);
+
+		ei.setStream("input", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_0 * BS);
+		ei.setStream("weights1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_0 * SIZE_LAYER_1);
+		ei.setStream("biases1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1);
+		ei.setStream("s1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * BS);
+		ei.setStream("x1", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * BS);
+		ei.setStream("weights2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_1 * SIZE_LAYER_2);
+		ei.setStream("biases2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2);
+		ei.setStream("s2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2 * BS);
+		ei.setStream("x2", cpuT, cpuT.sizeInBytes() * SIZE_LAYER_2 * BS);
+
+		ei.setScalar(KERNEL_NAME1, FLinearLayerTileKernel.INNBVEC_NAME, inNbVec1);
+		ei.setScalar(KERNEL_NAME1, FLinearLayerTileKernel.OUTNBBLOCK_NAME, outNbVec1);
+		ei.setScalar(KERNEL_NAME2, FLinearLayerTileKernel.INNBVEC_NAME, inNbVec2);
+		ei.setScalar(KERNEL_NAME2, FLinearLayerTileKernel.OUTNBBLOCK_NAME, outNbVec2);
+
+		return ei;
+	}
 	
-	
-
-	 public static void main(String[] args) {
+	public static void main(String[] args) {
 		EngineParameters params = new EngineParameters(args);
-	    ForwardPropTileMAX5CManager mgr = new ForwardPropTileMAX5CManager(params);
-	    mgr.createSLiCinterface(mgr.interfaceDefault());
-	    
-	    BuildConfig buildConfig = mgr.getBuildConfig();
-	    buildConfig.setBuildEffort(Effort.HIGH);
+		ForwardPropTileMAX5CManager mgr = new ForwardPropTileMAX5CManager(params);
+		mgr.createSLiCinterface(mgr.interfaceDefault());
 
-	    mgr.build();
+		BuildConfig buildConfig = mgr.getBuildConfig();
+		buildConfig.setBuildEffort(Effort.HIGH);
+
+		mgr.build();
 	}
 }
