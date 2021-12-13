@@ -33,7 +33,12 @@ g++ -O3 -g -Imnist src/MLP-train-framework.cpp -o build/MLP-train-framework
 ```
 Then you can run the framework using `./build/MLP-train-framework`. You can choose any structure you want and it will train your network on the MNIST dataset.
 
+
 ## Forward propagation performances
-The `MLP-forward` directory contains the files for the comparison of the execution time of forward propagation between CPU and FPGA. Implementations are explained here: [MLP Forward Propagation on CPU: Tests and Results](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-CPU:-Tests-and-Results) & [MLP Forward Propagation on DFE: Structure](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-DFE:-Structure). Final results can be found here: [MLP Forward Propagation on DFE: Results and Optimization](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-DFE:-Results-and-Optimization).
+The `MLP-forward` directory contains the files for the comparison of the execution time of forward propagation between CPU and FPGA. 
+
+Implementations are explained here: [MLP Forward Propagation on CPU: Tests and Results](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-CPU:-Tests-and-Results) & [MLP Forward Propagation on DFE: Structure](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-DFE:-Structure). 
+
+Final results can be found here: [MLP Forward Propagation on DFE: Results and Optimization](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-DFE:-Results-and-Optimization).
 
 Respective source codes are located in `MLP-forward/CPU` and `MLP-forward/DFE`.
