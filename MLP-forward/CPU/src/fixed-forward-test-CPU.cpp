@@ -1,7 +1,6 @@
 /**
- * Document: forward-test-CPU.cpp
  * Summary:
- *        Test speed of forward propagation on CPU
+ *        Test speed of forward propagation on CPU with fixed-point representation and multi-threading
  */
 
 #include <math.h>
@@ -22,8 +21,6 @@
 #define FIXED_POINT_FRACTIONAL_BITS 16
 
 #define BATCH_SIZE 1000
-
-
 
 typedef int32_t fixed_point_t;
 
@@ -245,8 +242,6 @@ PropResult forward_prop(vector<fixed_point_t> input){
 				}
 			}
 			
-			//float snow = sum_of_elems + current_neuron.bias;
-			//printf("%f\n", (float)snow / (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
 			curr_s.push_back(sum_of_elems + current_neuron.bias);
 			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
 			
@@ -273,8 +268,8 @@ void load_weights(){
 	string line;
 	float tmp;
 	fixed_point_t tmpFixed;
-	fstream wfile("../framework-dl-CPU/model/weights.txt");
-	fstream bfile("../framework-dl-CPU/model/biases.txt");
+	fstream wfile("model/weights.txt");
+	fstream bfile("model/biases.txt");
 
 	for(int i = 0; i < net.nb_layers; i++){
 		for(int j = 0; j< net.layers[i].size; j++){
@@ -321,18 +316,14 @@ int main(void)
 			curr_in.push_back(float_to_fixedpt(float_test_input[i][j]));
 			
 		}
-		for(int k = 0; k< 1; k++)
-			test_input.push_back(curr_in);
+		test_input.push_back(curr_in);
 	}
 	for(int i = 0; i < float_test_target.size(); i++){
 		vector<fixed_point_t> curr_tar;
 		for(int j = 0; j < float_test_target[0].size(); j++){
 			curr_tar.push_back(float_to_fixedpt(float_test_target[i][j]));
-			//printf("%d      ", float_to_fixedpt(float_test_target[i][j]));
-			//printf("%f      ", (float_test_target[i][j]));
 		}
-		for(int k = 0; k< 1; k++)
-			test_target.push_back(curr_tar);
+		test_target.push_back(curr_tar);
 	}
 	
 	
@@ -363,16 +354,17 @@ int main(void)
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-	omp_set_num_threads(128);
 	#pragma omp parallel for reduction(+:nb_test_errors)
 
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
 		result = forward_prop(test_input[i]);
+
 		/*for(int j = 0; j < test_target_size; j++){
 			printf("%d  %f\n",i*10+j, (float)get<1>(result)[1][j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
 		}*/
-		//if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
+
+		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
 	}
 	printf("%d\n", nb_test_errors);
 	struct timeval end;

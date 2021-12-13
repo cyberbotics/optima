@@ -1,5 +1,4 @@
 /**
- * Document: forward-test-CPU.cpp
  * Summary:
  *        Test speed of forward propagation on CPU
  */
@@ -16,7 +15,6 @@
 #include <iterator>
 #include <random>
 #include <algorithm>
-#include <omp.h>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
 #define BATCH_SIZE 10000
@@ -220,7 +218,6 @@ PropResult forward_prop(vector<float> input){
 
 			curr_s.push_back(sum_of_elems + current_neuron.bias);
 			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
-			
 		}
 
 		s.push_back(curr_s);
@@ -243,8 +240,8 @@ int verify_classification(vector<float> result){
 void load_weights(){
 	string line;
 	float tmp;
-	fstream wfile("../framework-dl-CPU/model/weights.txt");
-	fstream bfile("../framework-dl-CPU/model/biases.txt");
+	fstream wfile("model/weights.txt");
+	fstream bfile("model/biases.txt");
 
 	for(int i = 0; i < net.nb_layers; i++){
 		for(int j = 0; j< net.layers[i].size; j++){
@@ -306,8 +303,6 @@ int main(void)
 	float acc_time = 0;
 	struct timeval start;
 	gettimeofday(&start, NULL);
-
-	#pragma omp parallel for reduction(+:nb_test_errors)
 
 	for (int i = 0; i< nb_images; i++){
 		PropResult result;
