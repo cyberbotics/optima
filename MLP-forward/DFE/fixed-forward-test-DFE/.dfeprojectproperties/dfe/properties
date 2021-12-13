@@ -1,0 +1,4 @@
+#Fri Dec 10 16:43:33 CET 2021
+manager=forward.ForwardPropFixed8MAX5CManager
+jvmargs=-Xmx2G
+parameters=DFEModel\=MAIA maxFileName\=FixedForwardProp target\=DFE

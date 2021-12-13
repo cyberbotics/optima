@@ -1,0 +1,173 @@
+/**
+ * Summary:
+ * 	 Forward propagation of 1 linear layer.
+ */
+
+package forward;
+
+import utils.DotProductKernel;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Count.Counter;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Count.Params;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Count.WrapMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Mem.RamWriteMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Stream.OffsetExpr;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.KernelMath;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+import com.maxeler.maxcompiler.v2.utils.MathUtils;
+
+public class FLinearLayerFixed8Kernel extends Kernel {
+
+  public static final String IN_NAME = "input";
+  public static final String W_NAME = "weights";
+  public static final String B_NAME = "biases";
+  public static final String S_NAME = "s";
+  public static final String X_NAME = "x";
+  public static final String INNBVEC_NAME = "innbvec";
+  public static final String OUTNBVEC_NAME = "outnbvec";
+  public static final String MU_NAME = "mu";
+  public static final String STD_NAME = "std";
+  public static final String OFFSET = "offset";
+  
+  DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
+
+  private final DFEVectorType<DFEVar>  inVec, parallelVec, outVec;
+  
+  public FLinearLayerFixed8Kernel(KernelParameters params, int vecSize, int oVecSize, int nbWeightVec, int nbBiases, int nbInVec, int nbOutVec, int firstLayer) {
+    super(params);
+    
+    this.inVec = new DFEVectorType<DFEVar>(dfeUInt(8), vecSize);
+    this.parallelVec = new DFEVectorType<DFEVar>(fixedPtType, vecSize);
+    this.outVec = new DFEVectorType<DFEVar>(fixedPtType, oVecSize);
+    
+    DFEVar nbVecI = io.scalarInput(INNBVEC_NAME, dfeUInt(MathUtils.bitsToAddress(nbInVec+1))); 
+    DFEVar nbVecO = io.scalarInput(OUTNBVEC_NAME, dfeUInt(MathUtils.bitsToAddress(nbOutVec+1)));
+    
+    OffsetExpr loopLatency = stream.makeOffsetAutoLoop(OFFSET);
+    DFEVar loopLatencyVal = loopLatency.getDFEVar(getKernel(), dfeUInt(32));
+    
+    Params wCounterParams = control.count.makeParams (MathUtils.bitsToAddress(nbWeightVec+1)).withMax(nbWeightVec).withWrapMode(WrapMode.STOP_AT_MAX);
+	Counter wCounter = control.count.makeCounter(wCounterParams);
+	DFEVar readingW = wCounter.getCount() < nbWeightVec ? constant.var(true) : constant.var(false);
+	DFEVar readingB = wCounter.getCount() < nbBiases ? constant.var(true) : constant.var(false);
+		
+    DFEVar mu = io.scalarInput(MU_NAME, dfeFloat(8,24)).cast(fixedPtType); 
+    DFEVar std = io.scalarInput(STD_NAME, dfeFloat(8,24)).cast(fixedPtType);
+    
+    CounterChain chain = control.count.makeCounterChain(~readingW);
+    DFEVar h = chain.addCounter(nbVecO, 1);
+    DFEVar w = chain.addCounter(nbVecI, 1);
+    DFEVar l = chain.addCounter(loopLatencyVal, 1);
+ 
+    DFEVector<DFEVar> weights = io.input(W_NAME, parallelVec, readingW);
+    DFEVar biases = io.input(B_NAME, fixedPtType, readingB);
+    
+    // Write weights and biases to the memory
+    Memory<DFEVector<DFEVar>> wMem = mem.alloc(parallelVec, nbWeightVec);
+    Memory<DFEVar> bMem = mem.alloc(fixedPtType, nbBiases);
+ 	wMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))), weights, readingW);
+ 	bMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))), biases, readingB);
+    
+    DFEVector<DFEVar> input;
+    Memory<DFEVector<DFEVar>> ibuf;
+    DFEVector<DFEVar> inPort;
+    
+    // Types differ in function of layer
+    if(firstLayer == 1){
+    	input = io.input(IN_NAME, inVec, ~readingW & h.eq(0) & l.eq(0));
+    	// Write each input vector to the memory (multiple dot product with diff weights)
+    	ibuf =  mem.alloc(inVec, nbInVec+1);
+    	inPort = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);}
+    else{
+    	input = io.input(IN_NAME, parallelVec, ~readingW & h.eq(0) & l.eq(0));
+    	// Write each input vector to the memory (multiple dot product with diff weights)
+    	ibuf =  mem.alloc(parallelVec, nbInVec+1);
+    	inPort = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);}
+    
+    // Normalize input
+    DFEVector<DFEVar> normalInPort = parallelVec.newInstance(getKernel());
+    normalInPort = (inPort.cast(parallelVec) - mu) / std;
+    
+    DFEVar wcount = h.cast(dfeUInt(32)) * nbVecI.cast(dfeUInt(32)) * oVecSize + w.cast(dfeUInt(32));
+	
+	DFEVar address = dfeUInt(MathUtils.bitsToAddress(nbWeightVec)).newInstance(getKernel());
+	DFEVector<DFEVar> coeff = parallelVec.newInstance(getKernel());
+	DFEVar tmp = fixedPtType.newInstance(getKernel());
+	DFEVar newSum = fixedPtType.newInstance(getKernel());
+	DFEVar bias = fixedPtType.newInstance(getKernel());
+	DFEVector<DFEVar> s = outVec.newInstance(getKernel());
+    DFEVector<DFEVar> x = outVec.newInstance(getKernel());
+	
+	// Compute oVecSize dot products at each clock cycle
+    for (int r = 0; r < oVecSize; r++) {
+    	address = wcount + r*nbVecI.cast(dfeUInt(32));
+    	
+    	// Read correct weight chunk in memory
+    	coeff = wMem.read(address.cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))));
+    	
+    	// Perform dot product between input and weights vector
+    	DotProductKernel dp = new DotProductKernel(getKernel(), vecSize, fixedPtType);
+    	dp.setInputs(normalInPort, coeff);
+    	tmp = dp.getOutput();
+    	
+    	// Add all corresponding dot products together
+    	DFEVar carriedSum = fixedPtType.newInstance(this);
+    	DFEVar sum = (w.eq(0)) ? constant.var(0).cast(fixedPtType) : carriedSum;
+    	newSum = sum + tmp;	
+    	carriedSum.connect(stream.offset(newSum, -loopLatency));
+    	
+    	// Add corresponding bias and apply activation function
+    	DFEVar biasAddress = h.cast(dfeUInt(32))*oVecSize + r;
+    	bias = bMem.read(biasAddress.cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))));
+    	s[r] <== newSum + bias;
+    	x[r] <== tanh(s[r]);
+    	
+    }
+    // Only enable output when all operations have been done for 1 input vector
+	DFEVar outEnable = w.eq(nbVecI - 1) & l.eq(loopLatencyVal - 1);	
+	
+    io.output(S_NAME, outVec, outEnable).connect(s);
+    io.output(X_NAME, outVec, outEnable).connect(x);
+    
+    /*nbVecI.simWatch("nbVecI"+p);
+	nbVecO.simWatch("nbVecO"+p);
+    h.simWatch("h"+p);
+    w.simWatch("w"+p);	
+    l.simWatch("l"+p);
+	wcount.simWatch("wcount"+p);
+    mu.cast(fixedPtType).simWatch("mu");
+    std.simWatch("std");
+	inPort.simWatch("port"+p);
+	normalInPort.simWatch("normalInPort"+p);
+    address.simWatch("address"+p);
+  	coeff.simWatch("coeff"+p);
+  	tmp.simWatch("dotProd"+p);
+  	newSum.simWatch("sum"+p);
+  	bias.simWatch("bias"+p);
+  	s.simWatch("s"+p);
+  	x.simWatch("x"+p);
+  	outEnable.simWatch("outEnable"+p);*/
+    
+  }
+  
+  public DFEVar tanh(DFEVar input) {
+      DFEVar x = input;
+      // Exp
+      DFEVar Exp2xPlus1 = KernelMath.exp(2*x, fixedPtType) + 1.0;
+      // Div
+      DFEVar DivResult = 2.0 / Exp2xPlus1;
+      // Sub
+      DFEVar Result = 1.0 - DivResult.cast(fixedPtType);
+      return Result;
+  }
+
+}
+

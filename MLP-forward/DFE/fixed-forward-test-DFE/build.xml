@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="build">
+	<description>
+Build system for DFE Project.
+Ant 'target' parameter represents Maxfile Generation Parameters.
+
+To create a Maxfile:
+  ant -Dtarget=&lt;available_target&gt;
+
+To compile class files:
+  ant compile
+
+To clean a project run:
+  ant clean
+
+To list available targets run:
+  ant list_targets
+
+To creat a target run:
+  ant create_target -Dtarget_name=&lt;...&gt; -Dmanager=&lt;...&gt; \
+                    -Djvmargs=&lt;...&gt; -Dparameters=&lt;...&gt;
+
+You can manually create a Maxfile Generation Parameters target
+by creating a directory with the desired target name in
+.dfeprojectproperties and creating a properties file named
+"properties" inside of it with the following parameters:
+  jvmargs=&lt;Arguments for JVM&gt;
+  manager=&lt;Fully qualified name of the manager class&gt;
+  parameters=&lt;Command line arguments for the specified manager&gt;
+	</description>
+
+	<property environment="env"/>
+	<property file=".dfeprojectproperties/classpath"/>
+
+	<dirset id="targets.id" dir=".dfeprojectproperties" includes="*"/>
+	<property name="targets" refid="targets.id"/>
+
+	<taskdef name="maxjcompiler" classname="org.eclipse.jdt.core.ant.taskdef.MaxjTask" classpath="${ECJJCP}" onerror="ignore"/>
+
+	<!-- @brief Checks if the specified target exsists. -->
+	<target name="check_target">
+		<fail message="Target '${target}' not available.">
+			<condition>
+				<not>
+					<contains string=";${targets};" substring=";${target};"/>
+				</not>
+			</condition>
+Available targets are (separated by semicolon): 
+  ${targets}
+
+To run the build with proper target run:
+  ant -Dtarget=&lt;available_target&gt;
+		</fail>
+	</target>
+
+	<target name="create_target"
+	        description="Creates a new target.">
+		<mkdir dir=".dfeprojectproperties/${target_name}"/>
+		<propertyfile file=".dfeprojectproperties/${target_name}/properties">
+			<entry key="manager" value="${manager}"/>
+			<entry key="parameters" value="${parameters}"/>
+			<entry key="jvmargs" value="${jvmargs}"/>
+		</propertyfile>
+	</target>
+
+	<target name="clean"
+	        description="Cleans the project.">
+		<delete includeemptydirs="true">
+			<fileset dir="." includes="**/*.class"/>
+		</delete>
+	</target>
+
+	<target name="update_build_location"
+	        description="Updates location of the builds.">
+		<echo>Updating builds location.</echo>
+		<fail message="Build location has not been passed.">
+			<condition>
+				<or>
+					<equals arg1="${build_location}" arg2=""/>
+					<not>
+						<isset property="build_location"/>
+					</not>
+				</or>
+			</condition>
+		</fail>
+		<propertyfile file=".dfeprojectproperties/build_location">
+			<entry key="maxcompiler_builds_location" value="${build_location}"/>
+		</propertyfile>
+	</target>
+
+	<target name="list_targets"
+	        description="Lists all available target (Maxfile generation parameters) configuration.">
+		<property file=".dfeprojectproperties/build_location"/>
+	</target>
+
+	<target name="compile" description="Compiles files from source directories.">
+		<maxjcompiler srcdir="${MAXSOURCEDIRS}" destdir="${MAXDESTDIR}" debug="true" debuglevel="lines,vars,source" source="${javaVersionSource}" target="${javaVersionTarget}" failonerror="true">
+			<classpath path="${MAXCLASSPATH}"/>
+		</maxjcompiler>
+	</target>
+
+	<target name="build" depends="check_target, compile"
+	        description="Creates Maxfile from the specifed target (Maxfile generation parameters) configuration.">
+		<property file=".dfeprojectproperties/${target}/properties"/>
+		<property file=".dfeprojectproperties/build_location"/>
+		<propertyfile file=".dfeprojectproperties/build_location">
+			<entry key="build_name" value="${build_name}"/>
+		</propertyfile>
+		<fail message="Build name has not been set!${line.separator}Please pass the build name by passing -Dbuild_name parameter to the ant call.${line.separator}Or enable popup from Button Configure menu in the MaxIDE toolbar.">
+			<condition>
+				<equals arg1="${build_name}" arg2=""/>
+			</condition>
+		</fail>
+		<condition property="args" else="">
+			<isset property="args"/>
+		</condition>
+		<copy includeemptydirs="false" todir="${MAXDESTDIR}">
+			<fileset dir="${MAXSOURCEDIRS}" excludes="**/*.java, **/*.maxj"/>
+		</copy>
+		<java classname="${manager}" fork="true" failonerror="true">
+			<env key="MAXSOURCEDIRS" value="${MAXSOURCEDIRS}"/>
+			<env key="MAXCOMPILER_BUILD_CONF" value="build.datestamp_builds=false;build.root_dir=${maxcompiler_builds_location}/${build_name}"/>
+			<env key="CLASSPATH" value="${CLASSPATH}"/>
+			<arg line="${parameters} ${args}"/>
+			<jvmarg line="${jvmargs}"/>
+			<classpath path="${MAXDESTDIR}:${MAXCLASSPATH}:${CLASSPATH}"/>
+		</java>
+	</target>
+</project>
