@@ -1,6 +1,6 @@
 /**
  * Summary:
- * 	 Forward propagation of 1 linear layer.
+ * 	 Forward propagation of 1 linear layer improved with fixed point representation and on-chip normalization.
  */
 
 package forward;
