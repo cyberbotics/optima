@@ -17,7 +17,7 @@
 #include <algorithm>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 10000
+#define BATCH_SIZE 60000
 
 using namespace std;
 using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;	
@@ -27,27 +27,16 @@ class Neuron{
 		vector<float> out_weights;
 		float bias;	
 
-		vector<float> dw;
-		float dbias;
-		float dx;
-		float ds;
-
 		int nb_weights;
 
 		Neuron(){};
 
 		Neuron(int input_size){
-			random_device rd;
-    		default_random_engine e1(rd());	
-			normal_distribution<float> normal(0.,1e-6);
+
 			for (int i = 0; i < input_size; i++) { 
-				out_weights.push_back(normal(e1));
-				dw.push_back(0.);
+				out_weights.push_back(0.);
 			}
-			bias = normal(e1);
-			dbias = 0.;
-			dx = 0.;
-			ds = 0.;
+			bias = 0.;
 
 			nb_weights = out_weights.size();
 		};
@@ -82,16 +71,12 @@ class Network{
 
 		Network(vector<LinearLayer> ls, int size){
 			nb_layers = size;
-			for (int i = 0; i < size; i++) {
-				layers.push_back(ls[i]);
-			}
+			layers = ls;
 		};
 
 		void setLayers(vector<LinearLayer> ls, int size){
 			nb_layers = size;
-			for (int i = 0; i < size; i++) {
-				layers.push_back(ls[i]);
-			}
+			layers = ls;
 		}
 
 		~Network(){};
