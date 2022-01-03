@@ -26,16 +26,6 @@ const float TARGET_MEANS[] = {6.3157e-04, 5.1197e+01};
 const float TARGET_STDS[] = {0.0729, 16.7403};
 
 using namespace std;
-using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;
-
-template<typename T>
-vector<T> flatten(const vector<vector<T>> &orig)
-{
-    vector<T> ret;
-    for(const auto &v: orig)
-        ret.insert(ret.end(), v.begin(), v.end());
-    return ret;
-}
 
 class Neuron{
 	public:
@@ -190,14 +180,12 @@ Network net;
 float elu(float x){	
 	float output = 0.;
 	
-	//output = fmax(x,0.);
 	output = (x > 0.0f) * x + (x <= 0.0f) * ((float)exp(x) - 1.0f);
 
 	return output;
 }
 
 vector<float> forward_prop(vector<float> input){
-	float sum = 0.;
 	
 	ConvLayer current_conv_layer;
 	MaxPoolLayer current_pool_layer;
@@ -218,15 +206,19 @@ vector<float> forward_prop(vector<float> input){
 			prevx = x;
 		x.clear();
 
+		printf("prevx = %f\n",prevx[0]);
+
 		if(layer_type == CONV){
+			
 			current_conv_layer = net.conv_layers[layer_id];
+		
 			for (int nc = 0; nc < current_conv_layer.nb_kernels; nc++)
 			{
 				for (int nh = 0; nh < current_conv_layer.out_height; nh++)
 				{
 					for (int nw = 0; nw < current_conv_layer.out_width; nw++)
 					{
-						sum = 0;
+						float sum = 0.;
 						for (int kc = 0; kc < current_conv_layer.in_channels; kc++)
 						{
 							for (int kh = 0; kh < current_conv_layer.kernel_size; kh++)
@@ -246,10 +238,16 @@ vector<float> forward_prop(vector<float> input){
 				}
 			}
 
+
 		}
 
 		else if(layer_type == POOL){		
+			
 			current_pool_layer = net.pool_layers[layer_id];
+
+			float acc_time = 0;
+			struct timeval start;
+			gettimeofday(&start, NULL);
 
 			int out_channels = current_pool_layer.in_channels;
 			int out_height = floor(current_pool_layer.in_height/current_pool_layer.filter_size);
@@ -269,13 +267,15 @@ vector<float> forward_prop(vector<float> input){
 						{
 							for (int pw = 0; pw < current_pool_layer.filter_size; pw++)
 							{
-								const int inY = nh + ph;
-								const int inX = nw + pw;
+								const int inY = nh*current_pool_layer.filter_size + ph;
+								const int inX = nw*current_pool_layer.filter_size + pw;
 								if (inY >= 0 && inY<current_pool_layer.in_height && inX >= 0 && inX<current_pool_layer.in_width)
 								{
-									const int prevIdx = nc*current_conv_layer.in_height*current_conv_layer.in_width + inY*current_conv_layer.in_width + inX;
-
-									if (result < prevx[prevIdx])
+									const int prevIdx = nc*current_pool_layer.in_height*current_pool_layer.in_width + inY*current_pool_layer.in_width + inX;
+									if (ph == 0 && pw == 0){
+										result = prevx[prevIdx];
+									}
+									else if (result < prevx[prevIdx])
 									{
 										result = prevx[prevIdx];
 									}
@@ -287,31 +287,40 @@ vector<float> forward_prop(vector<float> input){
 					}
 				}
 			}
+			struct timeval end;
+			gettimeofday(&end, NULL);
+			acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
+			printf("%f\n", acc_time);
 		}
 
-		else if(layer_type == LINEAR){
-			current_lin_layer = net.linear_layers[layer_id];
 
-			for(int j = 0; j<current_lin_layer.nb_neurons; j++){
-				sum = 0.;
-				current_neuron = current_lin_layer.neurons[j];
+		else if(layer_type == LINEAR){
+			float acc_time = 0;
+			struct timeval start;
+			gettimeofday(&start, NULL);
+
+			for(int j = 0; j<net.linear_layers[layer_id].nb_neurons; j++){
+				float sum = 0.;
+				current_neuron = net.linear_layers[layer_id].neurons[j];
 				for(int k = 0; k<current_neuron.nb_weights; k++){
 					sum += current_neuron.out_weights[k] * prevx[k];
 				}
 
-				x.push_back(elu(sum + current_neuron.bias));
+				if(i == net.nb_layers-1){
+					x.push_back(sum + current_neuron.bias);
+				}
+				else{
+					x.push_back(elu(sum + current_neuron.bias));
+				}
 			}
+			struct timeval end;
+			gettimeofday(&end, NULL);
+			acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
+			printf("%f\n", acc_time);
 		}		
 	}
 
 	return x;
-}
-
-
-int verify_classification(vector<float> result){
-	int pred;
-	pred = max_element(result.begin(),result.end()) - result.begin();
-	return pred;
 }
 
 void load_weights(){
@@ -363,7 +372,7 @@ void load_weights(){
 int main(void)
 {		
 	load_weights();
-	printf("Weights and biases successfully loaded !\n");
+	printf("Weights and biases successfully loaded!\n");
 	
 	vector<float> input(3*80*320);
     float value = 255.;
@@ -379,7 +388,6 @@ int main(void)
 	for(int i = 2*input.size()/3; i < input.size(); i++){
 		input[i] = (input[i] - INPUT_MEANS[2])/INPUT_STDS[2];
 	}
-
 
 	float acc_time = 0;
 	struct timeval start;

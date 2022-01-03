@@ -1,6 +1,6 @@
 /**
  * Summary:
- *        Test speed of forward propagation on CPU with fixed-point representation and multi-threading
+ *        Test speed of forward propagation on CPU
  */
 
 #include <math.h>
@@ -14,19 +14,27 @@
 #include <tuple>
 #include <iterator>
 #include <random>
-#include <algorithm>
 #include <omp.h>
-#include "mnist/include/mnist/mnist_reader.hpp"	
+#include <algorithm>
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
 
-#define BATCH_SIZE 1000
+#define CONV 0
+#define POOL 1
+#define LINEAR 2
 
-typedef int32_t fixed_point_t;
+const float INPUT_MEANS[] = {75.5759, 80.3124, 82.3455};
+const float INPUT_STDS[] = {41.0884, 50.9617, 55.9314};
+const float TARGET_MEANS[] = {6.3157e-04, 5.1197e+01};
+const float TARGET_STDS[] = {0.0729, 16.7403};
+
+typedef int64_t fixed_point_t;
 
 using namespace std;
-using PropResult = tuple<vector<vector<fixed_point_t>>, vector<vector<fixed_point_t>>>;	
 
+float fixedpt_to_float(fixed_point_t input){
+	return (float) input / (float)(1 << FIXED_POINT_FRACTIONAL_BITS);
+}
 
 fixed_point_t float_to_fixedpt(float input)
 {
@@ -36,9 +44,9 @@ fixed_point_t float_to_fixedpt(float input)
 fixed_point_t fixed_mul(fixed_point_t a, fixed_point_t b)
 {
     fixed_point_t result;
-    int32_t temp;
+    int64_t temp;
 
-    temp = (int32_t)a * (int32_t)b;
+    temp = (int64_t)a * (int64_t)b;
     
     temp += (1 << (FIXED_POINT_FRACTIONAL_BITS - 1)); //round
     
@@ -52,27 +60,15 @@ class Neuron{
 		vector<fixed_point_t> out_weights;
 		fixed_point_t bias;	
 
-		vector<fixed_point_t> dw;
-		fixed_point_t dbias;
-		fixed_point_t dx;
-		fixed_point_t ds;
-
 		int nb_weights;
 
 		Neuron(){};
 
 		Neuron(int input_size){
-			random_device rd;
-    		default_random_engine e1(rd());	
-			normal_distribution<float> normal(0.,1e-6);
 			for (int i = 0; i < input_size; i++) { 
-				out_weights.push_back(float_to_fixedpt(normal(e1)));
-				dw.push_back(0.);
+				out_weights.push_back(0);
 			}
-			bias = float_to_fixedpt(normal(e1));
-			dbias = 0.;
-			dx = 0.;
-			ds = 0.;
+			bias = 0;
 
 			nb_weights = out_weights.size();
 		};
@@ -80,15 +76,41 @@ class Neuron{
 		~Neuron(){};
 };
 
+class Kernel{
+	public:
+		int nb_weights;
+		int k_size;
+		int k_depth;
+
+		vector<fixed_point_t> weights;
+		fixed_point_t bias;
+
+		Kernel(){};
+		Kernel(int size, int depth){
+			for (int i = 0; i < size*size*depth; i++) { 
+				weights.push_back(0);
+			}
+			bias = 0;
+
+			nb_weights = weights.size();
+			k_size = size;
+			k_depth = depth;	
+		};
+
+		~Kernel(){};
+};
+
+
 class LinearLayer{
 	public:
-		int size;
+		int nb_neurons;
 		vector<Neuron> neurons;
+
 
 		LinearLayer(){};
 
 		LinearLayer(int s, int input_size){
-			size = s;
+			nb_neurons = s;
 			for (int i = 0; i < s; i++) {
 				neurons.push_back(Neuron(input_size));
 			}
@@ -98,26 +120,84 @@ class LinearLayer{
 
 };
 
-class Network{
+class ConvLayer{
 	public:
-		int nb_layers;
-		vector<LinearLayer> layers;
+		int nb_kernels;
+		int kernel_size;
+		vector<Kernel> kernels;
 
-		Network(){};
+		int in_channels;
+		int in_width;
+		int in_height;
+		int out_width;
+		int out_height;
+		
 
-		Network(vector<LinearLayer> ls, int size){
-			nb_layers = size;
-			for (int i = 0; i < size; i++) {
-				layers.push_back(ls[i]);
+		ConvLayer(){};
+		ConvLayer(int k_size, int inChan, int inH, int inW, int outChan, int outH, int outW){
+			
+			in_channels = inChan;
+			in_width = inW;
+			in_height = inH;
+
+			out_width = outW;
+			out_height = outH;
+			nb_kernels = outChan;
+			kernel_size = k_size;
+			for(int i = 0; i< outChan; i++){
+				kernels.push_back(Kernel(k_size, inChan));
 			}
 		};
 
-		void setLayers(vector<LinearLayer> ls, int size){
-			nb_layers = size;
-			for (int i = 0; i < size; i++) {
-				layers.push_back(ls[i]);
-			}
-		}
+		~ConvLayer(){};
+};
+
+class MaxPoolLayer{
+	public: 
+		int filter_size;
+		int in_channels;
+		int in_width;
+		int in_height;
+
+		MaxPoolLayer(){};
+		MaxPoolLayer(int f_size, int inChan, int inH, int inW){
+			filter_size = f_size;
+			in_channels = inChan;
+			in_height = inH;
+			in_width = inW;
+		};
+
+		~MaxPoolLayer(){};
+};
+
+class Network{
+	public:	
+		vector<ConvLayer> conv_layers;
+		vector<MaxPoolLayer> pool_layers;
+		vector<LinearLayer> linear_layers;
+
+		vector<int> layer_types;
+		vector<int> layers;
+
+		int nb_layers;
+
+		Network(){
+			conv_layers.push_back(ConvLayer(3,3,80,320,16,78,318));
+			conv_layers.push_back(ConvLayer(3,16,39,159,32,37,157));
+			conv_layers.push_back(ConvLayer(3,32,18,78,64,16,76));
+
+			pool_layers.push_back(MaxPoolLayer(2,16,78,318));
+			pool_layers.push_back(MaxPoolLayer(2,32,37,157));
+			pool_layers.push_back(MaxPoolLayer(2,64,16,76));
+
+			linear_layers.push_back(LinearLayer(500,19456));
+			linear_layers.push_back(LinearLayer(2,500));
+
+			layer_types = {CONV,POOL,CONV,POOL,CONV,POOL,LINEAR,LINEAR};
+			layers = {0,0,1,1,2,2,0,1};
+
+			nb_layers = layers.size();
+		};
 
 		~Network(){};
 
@@ -125,143 +205,171 @@ class Network{
 
 Network net;
 
-vector<vector<float>> convert_labels(vector<u_int8_t> labels){
-	vector<vector<float>> converted_labels;
-	
-	for(int i = 0; i<labels.size(); i++){
-		vector<float> current_label;
-		for(int j = 0; j<10; j++){
-			if(j == labels[i]){
-				current_label.push_back(0.9);
-			}
-			else{
-				current_label.push_back(0.0);
-			}
-		}
-  		current_label.shrink_to_fit();                          
-  		converted_labels.push_back(move(current_label)); 
-	}
-	return converted_labels;
-}
+fixed_point_t elu(fixed_point_t x){	
 
-float compute_mu(vector<vector<float>> vec){
-	float mu;
-	float vecsize1 = (float)vec.size();
-	float vecsize2 = (float)vec[0].size();
-
-	for(int i = 0; i<vecsize1; i++){
-		for(int j = 0; j<vecsize2; j++){
-			mu += vec[i][j];
-		}
-	}
-	mu = mu / vecsize1 / vecsize2;
-	return mu;
-}
-
-float compute_std(vector<vector<float>> vec, float mu){
-	float std;
-	float vecsize1 = (float)vec.size();
-	float vecsize2 = (float)vec[0].size();
-
-	for(int i = 0; i<vecsize1; i++){
-		for(int j = 0; j<vecsize2; j++){
-			std += pow(vec[i][j]-mu,2);
-		}
-	}
-	std = sqrt(std / (vecsize1 * (vecsize2-1)));
-	return std;
-}
-
-vector<vector<float>> process_images(vector<vector<u_int8_t>> images_init, int desired_nb_images){
-	vector<vector<u_int8_t>>::const_iterator first = images_init.begin();
-	vector<vector<u_int8_t>>::const_iterator last = images_init.begin() + desired_nb_images;
-	vector<vector<u_int8_t>> train_input_init(first, last);
-
-	int nb_images = desired_nb_images;
-	int train_input_size = train_input_init[0].size();
-
-    vector<vector<float>> train_input;
-	for(int i = 0; i< nb_images;i++){
-		vector<float> train_input_single(train_input_init[i].begin(), train_input_init[i].end());
-		train_input_single.shrink_to_fit();                         
-  		train_input.push_back(move(train_input_single));
-	}
-	
-	float mu = compute_mu(train_input);
-	float std = compute_std(train_input, mu);
-	for(int i = 0; i<nb_images; i++){
-		for(int j = 0; j<train_input_size; j++){
-			train_input[i][j] -= mu;
-			train_input[i][j] /= std;
-		}
-	}
-
-	return train_input;
-}
-
-vector<vector<float>> process_targets(vector<u_int8_t> targets_init, int desired_nb_images){
-	vector<u_int8_t>::const_iterator first = targets_init.begin();
-	vector<u_int8_t>::const_iterator last = targets_init.begin() + desired_nb_images;
-	vector<u_int8_t> train_target_init(first, last);
-
-	vector<vector<float>> converted_train_target = convert_labels(train_target_init); // Convert to hot one labels
-	
-	return converted_train_target;
-}
-
-fixed_point_t sigma(fixed_point_t x){	
-	
 	fixed_point_t output = 0;
 	
-	//output = fmax(x,0.);
-	output = float_to_fixedpt(tanh((float)x / (float)(1 << FIXED_POINT_FRACTIONAL_BITS)));
+	float x1 = fixedpt_to_float(x);
+
+	output = float_to_fixedpt((x1 > 0) * x1 + (x1<= 0) * ((float)exp(x1) - 1)) ;
 
 	return output;
 }
 
-PropResult forward_prop(vector<fixed_point_t> input){
-	fixed_point_t sum_of_elems = 0.;
-	Neuron current_neuron;
-	vector<vector<fixed_point_t>> s;
-	vector<vector<fixed_point_t>> x;
+vector<fixed_point_t> forward_prop(vector<fixed_point_t> input){
 
-	for(int j = 0; j<net.nb_layers; j++){
-		//printf("j = %d \n", j);
-		vector<fixed_point_t> curr_s;
-		vector<fixed_point_t> curr_x;
+	ConvLayer current_conv_layer;
+	MaxPoolLayer current_pool_layer;
+	LinearLayer current_lin_layer;
+
+	vector<fixed_point_t> x;
+	vector<fixed_point_t> prevx;
+
+	for(int i = 0; i<net.nb_layers; i++){
+
+		int layer_id = net.layers[i];
+		int layer_type = net.layer_types[i];
 		
-		for(int i = 0; i<net.layers[j].size; i++){
-			sum_of_elems = 0.;
-			current_neuron = net.layers[j].neurons[i];
-			for(int l = 0; l<current_neuron.nb_weights; l++){
-				if (j==0){ //input layer
-					sum_of_elems += fixed_mul(current_neuron.out_weights[l], input[l]);
+		prevx.clear();
+		if(i == 0)
+			prevx = input;
+		else
+			prevx = x;
+		x.clear();
+
+		float acc_time = 0;
+		struct timeval start;
+		gettimeofday(&start, NULL);
+
+		
+		if(layer_type == CONV){
+		
+			current_conv_layer = net.conv_layers[layer_id];
+			int ih = current_conv_layer.in_height;
+			int iw = current_conv_layer.in_width;
+			int ks = current_conv_layer.kernel_size;
+
+			#pragma omp parallel
+			{
+				vector<fixed_point_t> x_private;
+				#pragma omp for nowait schedule(static)
+				for (int nc = 0; nc < current_conv_layer.nb_kernels; nc++)
+				{	
+					Kernel current_kernel = current_conv_layer.kernels[nc];
+					for (int nh = 0; nh < current_conv_layer.out_height; nh++)
+					{
+						for (int nw = 0; nw < current_conv_layer.out_width; nw++)
+						{
+							fixed_point_t sum = 0;
+							for (int kc = 0; kc < current_conv_layer.in_channels; kc++)
+							{
+								for (int kh = 0; kh < ks; kh++)
+								{
+									for (int kw = 0; kw < ks; kw++)
+									{
+										const int prevIdx = kc*ih*iw + (kh+nh)*iw + (kw+nw);
+										const int kernelIdx = kc*ks*ks + kh*ks + kw;
+										sum += fixed_mul(prevx[prevIdx], current_kernel.weights[kernelIdx]);
+									}
+								}
+							}
+							sum += current_kernel.bias;
+							
+							x_private.push_back(elu(sum));
+						}
+					}
 				}
-				else{ // hidden layers
-					sum_of_elems += fixed_mul(current_neuron.out_weights[l], x[j-1][l]);
+				#pragma omp for schedule(static) ordered
+				for(int i=0; i<omp_get_num_threads(); i++) {
+					#pragma omp ordered
+					x.insert(x.end(), x_private.begin(), x_private.end());
 				}
 			}
 			
-			curr_s.push_back(sum_of_elems + current_neuron.bias);
-			curr_x.push_back(sigma(sum_of_elems + current_neuron.bias));
-			
 		}
 
-		s.push_back(curr_s);
-		x.push_back(curr_x);
+		else if(layer_type == POOL){		
+			
+			current_pool_layer = net.pool_layers[layer_id];
+
+			int out_channels = current_pool_layer.in_channels;
+			int out_height = floor(current_pool_layer.in_height/current_pool_layer.filter_size);
+			int out_width = floor(current_pool_layer.in_width/current_pool_layer.filter_size);
+			
+
+			for (int nc = 0; nc < out_channels; nc++)
+			{
+				//printf("%d\n", nc);
+				for (int nh = 0; nh<out_height; nh++)
+				{	
+					for (int nw = 0; nw < out_width; nw++)
+					{
+						//printf("%d\n", nw);
+						fixed_point_t result = 0;
+
+						for (int ph = 0; ph < current_pool_layer.filter_size; ph++)
+						{
+							for (int pw = 0; pw < current_pool_layer.filter_size; pw++)
+							{
+								const int inY = nh*current_pool_layer.filter_size + ph;
+								const int inX = nw*current_pool_layer.filter_size + pw;
+								if (inY >= 0 && inY<current_pool_layer.in_height && inX >= 0 && inX<current_pool_layer.in_width)
+								{
+									const int prevIdx = nc*current_pool_layer.in_height*current_pool_layer.in_width + inY*current_pool_layer.in_width + inX;
+									if (ph == 0 && pw == 0){
+										result = prevx[prevIdx];
+									}
+									else if (result < prevx[prevIdx])
+									{
+										result = prevx[prevIdx];
+									}
+								}									
+							}
+						}
+
+						x.push_back(result);
+					}
+				}
+			}
+		}
+
+		else if(layer_type == LINEAR){
+
+			#pragma omp parallel
+			{
+				vector<fixed_point_t> x_private;
+				#pragma omp for nowait schedule(static)
+				for(int j = 0; j<net.linear_layers[layer_id].nb_neurons; j++){
+					
+					fixed_point_t sum = 0;
+					Neuron current_neuron = net.linear_layers[layer_id].neurons[j];
+					
+					for(int k = 0; k<current_neuron.nb_weights; k++){
+						sum += fixed_mul(current_neuron.out_weights[k], prevx[k]);
+					}
+
+					if(i == net.nb_layers-1){
+						x_private.push_back(sum + current_neuron.bias);
+					}
+					else{
+						x_private.push_back(elu(sum + current_neuron.bias));
+					}
+				}
+				#pragma omp for schedule(static) ordered
+				for(int i=0; i<omp_get_num_threads(); i++) {
+					#pragma omp ordered
+					x.insert(x.end(), x_private.begin(), x_private.end());
+				}
+			}
+			
+		}		
+		struct timeval end;
+		gettimeofday(&end, NULL);
+		acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
+		printf("t = %f\n", acc_time);
 	}
 
-	PropResult result;
-	result = make_tuple(s,x);
-
-	return result;
-}
-
-
-int verify_classification(vector<fixed_point_t> result){
-	int pred;
-	pred = max_element(result.begin(),result.end()) - result.begin();
-	return pred;
+	return x;
 }
 
 void load_weights(){
@@ -272,20 +380,43 @@ void load_weights(){
 	fstream bfile("model/biases.txt");
 
 	for(int i = 0; i < net.nb_layers; i++){
-		for(int j = 0; j< net.layers[i].size; j++){
-			for(int k = 0; k< net.layers[i].neurons[j].nb_weights; k++){
-				getline(wfile, line);
+		if(net.layer_types[i] == CONV){
+			int layer_id = net.layers[i];
+			for(int j = 0; j< net.conv_layers[layer_id].nb_kernels; j++){
+				for(int k = 0; k< net.conv_layers[layer_id].kernels[j].nb_weights; k++){
+					getline(wfile, line);
+					stringstream ss(line);
+					ss >> tmp;
+					tmpFixed = float_to_fixedpt(tmp);
+					net.conv_layers[layer_id].kernels[j].weights[k] = tmpFixed;
+				}
+				getline(bfile,line);
 				stringstream ss(line);
 				ss >> tmp;
 				tmpFixed = float_to_fixedpt(tmp);
-				net.layers[i].neurons[j].out_weights[k] = tmpFixed;
+				net.conv_layers[layer_id].kernels[j].bias = tmpFixed;
 			}
-			getline(bfile,line);
-			stringstream ss(line);
-			ss >> tmp;
-			tmpFixed = float_to_fixedpt(tmp);
-			net.layers[i].neurons[j].bias = tmpFixed;	
 		}
+
+		else if(net.layer_types[i] == LINEAR){
+			int layer_id = net.layers[i];
+			for(int j = 0; j< net.linear_layers[layer_id].nb_neurons; j++){
+				for(int k = 0; k< net.linear_layers[layer_id].neurons[j].nb_weights; k++){
+					getline(wfile, line);
+					stringstream ss(line);
+					ss >> tmp;
+					tmpFixed = float_to_fixedpt(tmp);
+					net.linear_layers[layer_id].neurons[j].out_weights[k] = tmpFixed;
+				}
+				getline(bfile,line);
+				stringstream ss(line);
+				ss >> tmp;
+				tmpFixed = float_to_fixedpt(tmp);
+				net.linear_layers[layer_id].neurons[j].bias = tmpFixed;
+			}
+		}
+
+		
 	}
 
 	bfile.close();
@@ -294,88 +425,46 @@ void load_weights(){
 
 int main(void)
 {		
-	// Load MNIST dataset using external library (https://github.com/wichtounet/mnist)
-	const string& folder = "src/mnist";	
-	auto dataset = mnist::read_dataset<vector, vector, uint8_t, uint8_t>(folder);
+	omp_set_num_threads(7);
 
-	// Process input data and labels
-	int desired_nb_images = BATCH_SIZE; // 60000 for full test set
-
-	vector<vector<u_int8_t>> test_input_full= dataset.training_images;
-	vector<u_int8_t> test_target_full= dataset.training_labels;
-
-	vector<vector<float>> float_test_input = process_images(test_input_full, desired_nb_images);
-	vector<vector<float>> float_test_target = process_targets(test_target_full, desired_nb_images);
-
-	vector<vector<fixed_point_t>> test_input;
-	vector<vector<fixed_point_t>> test_target;
-	
-	for(int i = 0; i < float_test_input.size(); i++){
-		vector<fixed_point_t> curr_in;
-		for(int j = 0; j < float_test_input[0].size(); j++){
-			curr_in.push_back(float_to_fixedpt(float_test_input[i][j]));
-			
-		}
-		test_input.push_back(curr_in);
-	}
-	for(int i = 0; i < float_test_target.size(); i++){
-		vector<fixed_point_t> curr_tar;
-		for(int j = 0; j < float_test_target[0].size(); j++){
-			curr_tar.push_back(float_to_fixedpt(float_test_target[i][j]));
-		}
-		test_target.push_back(curr_tar);
-	}
-	
-	
-	int nb_images = test_input.size();
-	int test_input_size = test_input[0].size();
-	int test_target_size = test_target[0].size();
-
-	int nb_test_errors = 0;
-	float perc_test_error = 0.;
-
-	// Network parameters
-	int hidden = 64;
-	vector<int> layer_size = {test_input_size, hidden, test_target_size};
-
-	int nb_layers = layer_size.size() - 1;
-
-	// Network creation
-	vector<LinearLayer> net_layers;
-	for(int i = 1; i< nb_layers+1;i++){
-		net_layers.push_back(LinearLayer(layer_size[i],layer_size[i-1]));
-	}
-	net.setLayers(net_layers, nb_layers);
-	
 	load_weights();
-	printf("Weights and biases successfully loaded !\n");
+	printf("Weights and biases successfully loaded!\n");
+	
+	vector<float> input(3*80*320);
+    float value = 255.;
+    fill(input.begin(), input.end(), value);
+
+	vector<fixed_point_t> inputFixed;
+
+	// Normalize input
+	for(int i = 0; i < input.size()/3; i++){
+		inputFixed.push_back(float_to_fixedpt((input[i] - INPUT_MEANS[0])/INPUT_STDS[0]));
+	}
+	for(int i = input.size()/3; i < 2*input.size()/3; i++){
+		inputFixed.push_back(float_to_fixedpt((input[i] - INPUT_MEANS[1])/INPUT_STDS[1]));
+	}
+	for(int i = 2*input.size()/3; i < input.size(); i++){
+		inputFixed.push_back(float_to_fixedpt((input[i] - INPUT_MEANS[2])/INPUT_STDS[2]));
+	}
+
 
 	float acc_time = 0;
 	struct timeval start;
 	gettimeofday(&start, NULL);
 
-	#pragma omp parallel for reduction(+:nb_test_errors)
+	vector<fixed_point_t> result;
+	result = forward_prop(inputFixed);
 
-	for (int i = 0; i< nb_images; i++){
-		PropResult result;
-		result = forward_prop(test_input[i]);
-
-		/*for(int j = 0; j < test_target_size; j++){
-			printf("%d  %f\n",i*10+j, (float)get<1>(result)[1][j]/ (float)(1 << FIXED_POINT_FRACTIONAL_BITS));
-		}*/
-
-		if (test_target[i][verify_classification(get<1>(result)[1])] < 0.5){nb_test_errors++;}
-	}
-	printf("%d\n", nb_test_errors);
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	acc_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)*1e-6;
-
-	printf ("%f seconds\n", acc_time);
+	printf("%f\n", acc_time);
 	
-	perc_test_error = 100*(float)nb_test_errors/ (float)nb_images;
-	printf("%% of test errors = %.1f%%\n", perc_test_error);	
+	float steering = fixedpt_to_float(result[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
+    float speed = fixedpt_to_float(result[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
 
+	printf("%f\n", steering);
+	printf("%f\n", speed);
 
 	return 0;
 }

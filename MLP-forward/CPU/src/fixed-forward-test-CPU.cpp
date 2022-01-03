@@ -20,7 +20,7 @@
 
 #define FIXED_POINT_FRACTIONAL_BITS 16
 
-#define BATCH_SIZE 1000
+#define BATCH_SIZE 100
 
 typedef int32_t fixed_point_t;
 

@@ -17,7 +17,7 @@
 #include <algorithm>
 #include "mnist/include/mnist/mnist_reader.hpp"	
 
-#define BATCH_SIZE 60000
+#define BATCH_SIZE 100
 
 using namespace std;
 using PropResult = tuple<vector<vector<float>>, vector<vector<float>>>;	
