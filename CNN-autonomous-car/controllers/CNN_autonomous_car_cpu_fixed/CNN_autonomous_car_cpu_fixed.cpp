@@ -7,7 +7,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <iostream>
 #include <sys/time.h>
 #include <sstream>
@@ -446,10 +445,9 @@ int main(void)
   	gettimeofday(&sim_start, NULL);
 
 	exit = wb_robot_step(timeStep);
-	
 	while (exit != -1) {
 		wb_robot_step_begin(timeStep); // code between step_begin() and step_end() is computed in parallel from Webots simulation to improve timing
-
+		
 		int input_size = 3*80*320;
 		vector<fixed_point_t> inputFixed;
 
@@ -498,12 +496,14 @@ int main(void)
 		if(sim_time > 60){
 			wb_supervisor_simulation_quit(0);
 		}
-
+                      
 		exit = wb_robot_step_end();
-
+  		
 		// Apply steering and speed values to car
 		wbu_driver_set_cruising_speed(speed);
 		wbu_driver_set_steering_angle(steering*1.7);
+		
+		
   	};
 
 	wbu_driver_cleanup();
