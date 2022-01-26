@@ -78,6 +78,8 @@ LFLAGS = -fopenmp
 
 USE_C_API = true
 
+VERBOSE = 1
+
 include $(WEBOTS_HOME_PATH)/resources/Makefile.include
 
 
