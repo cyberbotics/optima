@@ -1,0 +1,1 @@
+make run_dfe_with_event_monitoring

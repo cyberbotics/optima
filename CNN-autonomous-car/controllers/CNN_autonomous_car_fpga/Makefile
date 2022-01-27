@@ -71,12 +71,14 @@ null :=
 space := $(null) $(null)
 WEBOTS_HOME_PATH=$(subst $(space),\ ,$(strip $(subst \,/,$(WEBOTS_HOME))))
 
-LIBRARIES = -ldriver
+CFLAGS = -fPIC -O3
 
-CFLAGS = -fopenmp -O3
-LFLAGS = -fopenmp
+INCLUDE = -I../../libraries/cnn_dfe/inc/MAX5C/max -I/opt/maxeler/maxeleros/include -I/opt/Software/maxeler/maxcompiler-2018.3.1/include/slic  -I/opt/Software/maxeler/maxcompiler-2018.3.1/include/slic
+LIBRARIES = -L../../libraries/cnn_dfe/lib/MAX5C -L/opt/Software/maxeler/maxcompiler-2018.3.1/lib -L/opt/maxeler/maxeleros/lib -lslic -lmaxeleros -lm -lpthread -lcurl -lcnn_autonomous_car_dfe -ldriver
 
 USE_C_API = true
+
+VERBOSE = 1;
 
 include $(WEBOTS_HOME_PATH)/resources/Makefile.include
 

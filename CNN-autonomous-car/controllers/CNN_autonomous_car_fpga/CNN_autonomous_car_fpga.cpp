@@ -244,11 +244,11 @@ vector<fixed_point_t> network_evaluation(vector<fixed_point_t> input) {
   vector<double> fBias4(bLast3, bLast4);
   vector<double> fBias5(bLast4, bLast5);
 
-  printf("nb bias conv layer 1 = % d\n ", fBias1.size());
+  /*printf("nb bias conv layer 1 = % d\n ", fBias1.size());
   printf("nb bias conv layer 2 = % d\n ", fBias2.size());
   printf("nb bias conv layer 3 = %d\n", fBias3.size());
   printf("nb bias linear layer 1 = %d\n", fBias4.size());
-  printf("nb bias linear layer 2 = %d\n", fBias5.size());
+  printf("nb bias linear layer 2 = %d\n", fBias5.size());*/
 
   int outputSize = ConvNetwork_OS_LINEAR2 + ConvNetwork_OUT_PAD;
 
@@ -268,14 +268,14 @@ vector<fixed_point_t> network_evaluation(vector<fixed_point_t> input) {
   struct timeval start;
   gettimeofday(&start, NULL);
 
-  printf("Running DFE.\n");
+  // printf("Running DFE.\n");
   ConvNetwork_run(max_engine, &actions);
 
   struct timeval end;
   gettimeofday(&end, NULL);
   float acc_time =
       (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
-  printf("Run time = %f\n", acc_time);
+  // printf("Run time = %f\n", acc_time);
 
   return output;
 }
@@ -286,6 +286,7 @@ int main() {
 
   // create the driver instance.
   wbu_driver_init();
+  WbNodeRef car = wb_supervisor_node_get_from_def("AUTONOMOUS_CAR");
 
   // get the time step of the current world.
   int timeStep = (int)wb_robot_get_basic_time_step();
@@ -294,14 +295,11 @@ int main() {
   WbDeviceTag camera = wb_robot_get_device("camera");
   wb_camera_enable(camera, timeStep);
 
-  // load CNN parameters
-  load_weights();
-  printf("Weights and biases successfully loaded !\n");
-
   // int exit;
   int count = 0;
   double sim_time = 0;
   double real_time = 0;
+  double step_time = 0;
 
   struct timeval sim_start;
   gettimeofday(&sim_start, NULL);
@@ -309,8 +307,13 @@ int main() {
   wb_robot_step(timeStep);
 
   do {
+    const double *car_position = wb_supervisor_node_get_position(car);
+
     if (wb_robot_step_begin(timeStep) == -1)
       break;
+
+    struct timeval step_start;
+    gettimeofday(&step_start, NULL);
 
     int input_size =
         ConvNetwork_IC_CONV1 * ConvNetwork_HT_CONV1 * ConvNetwork_WT_CONV1;
@@ -351,18 +354,23 @@ int main() {
         fixedpt_to_float(result[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
 
     // time informations
-    struct timeval now;
-    gettimeofday(&now, NULL);
+    struct timeval step_end;
+    gettimeofday(&step_end, NULL);
 
     sim_time = wb_robot_get_time();
-    real_time = (now.tv_sec - sim_start.tv_sec) +
-                (now.tv_usec - sim_start.tv_usec) * 1e-6;
+    real_time = (step_end.tv_sec - sim_start.tv_sec) +
+                (step_end.tv_usec - sim_start.tv_usec) * 1e-6;
+    step_time = (step_end.tv_sec - step_start.tv_sec) +
+                (step_end.tv_usec - step_start.tv_usec) * 1e-6;
 
     count++;
-    if (int(sim_time) % 20 <= 0.01) {
-      printf("real_time = %f\n", real_time);
+    if (count % 300 == 0) {
+      printf("position = %f %f %f\n", car_position[0], car_position[1],
+             car_position[2]);
+      printf("real time = %f\n", real_time);
       printf("sim time = %f, sim ratio = %f\n", sim_time, sim_time / real_time);
-      printf("mean time = %f\n", real_time / count);
+      printf("step time = %f\n", step_time);
+      printf("mean time = %f\n\n", real_time / count);
     }
 
     // quit simulation after 60s (optional)
