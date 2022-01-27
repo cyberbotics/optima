@@ -6,7 +6,7 @@ In the context of Cyberbotics, the goal is to show that running a Webots robot s
 ## Cloning this repository
 
 When cloning this repository, don't forget to initialize the submodules.
-```
+``` console
 git clone https://github.com/cyberbotics/optima.git
 git submodule update --init --recursive
 ```
@@ -27,7 +27,7 @@ To code your own applications on Jumax, these 2 pages explain the required workf
 The first contribution consists in creating a framework which allows to create simple neural networks: multilayers perceptrons. The details of its implementation in C++ is given here: [Creation of a Deep Learning Frameowrk in C++](https://github.com/cyberbotics/optima/wiki/Creation-of-a-MLP-Deep-Learning-Framework-in-CPP). 
 
 The source code of the implementation is located in the `MLP-train-framework` directory. You can compile it using the following command
-```
+``` console
 cd MLP-train-framework
 mkdir build
 g++ -O3 -g -Imnist src/MLP-train-framework.cpp -o build/MLP-train-framework
