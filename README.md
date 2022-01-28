@@ -35,7 +35,7 @@ g++ -O3 -g -Imnist src/MLP-train-framework.cpp -o build/MLP-train-framework
 Then you can run the framework using `./build/MLP-train-framework`. You can choose any structure you want and it will train your network on the MNIST dataset.
 
 
-## Forward propagation performances
+## Forward propagation performance
 The `MLP-forward` directory contains the files for the comparison of the execution time of forward propagation between CPU and FPGA. 
 
 Implementations are explained here: [MLP Forward Propagation on CPU: Tests and Results](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-CPU:-Tests-and-Results) & [MLP Forward Propagation on DFE: Structure](https://github.com/cyberbotics/optima/wiki/MLP-Forward-Propagation-on-DFE:-Structure). 
