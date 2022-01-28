@@ -52,6 +52,6 @@ Note that the source codes are optimized for the Jumax machine, in particular co
 ## Autonomous car simulation
 The `CNN-autonomous-car` directory contains the Webots project of the self-driving car using a convolutional neural network. Its description can be found [here](https://github.com/cyberbotics/optima/wiki/Autonomous-Car-Simulation).
 
-The training and testing worlds are both located in `CNN-autonomous-car/worlds`. The different controller source codes are located in `CNN-autonomous-car/controllers`. The DFE optimization of the neural network is compiled in the cnn_dfe library.
+The training and testing worlds are both located in `CNN-autonomous-car/worlds`. The different controller source codes are located in `CNN-autonomous-car/controllers`. The DFE optimization of the neural network is compiled in a shared library: `CNN-autonomous-car/libraries/cnn_dfe`.
 
 You can select the controller to drive the car by editing the controller field in `CNN-autonomous-car/worlds/autonomous_car_test.wbt` and then [run Webots headless](https://github.com/cyberbotics/optima/wiki/Start-Webots) on Jumax.
