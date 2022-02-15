@@ -11,7 +11,7 @@ MAXOBJDIR := $(OBJDIR)/max
 CFLAGS := -fPIC -O3 -std=c++11 -Wall -Wextra
 LFLAGS :=
 
-EXE := CNN_autonomous_car_dfe
+EXE := cnn_dfe
 SONAME := lib$(shell echo $(EXE) | tr '[:upper:]' '[:lower:]').so
 
 TRIMMEDUSER := $(shell echo $(USER) | head -c 10)
