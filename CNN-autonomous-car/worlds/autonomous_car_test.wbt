@@ -1068,7 +1068,7 @@ DEF AUTONOMOUS_CAR TeslaModel3 {
   translation 216.574 -20.0771 0.4
   rotation 0 0 1 -2.0937353071795863
   controller "CNN_autonomous_car_fpga"
-  controllerArgs "0"
+  controllerArgs ["2"]
   supervisor TRUE
   sensorsSlotFront [
     Camera {
