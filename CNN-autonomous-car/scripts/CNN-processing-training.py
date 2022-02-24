@@ -148,7 +148,6 @@ def import_img_batch_train(start, end):
         images.append(flip_img_right)
     return images
 
-plt.show()
 # Compute mean and standard deviation per mini-batch
 ncum = list(range(0,len(allSteerings),50)) + [len(allSteerings)]
 ncum = np.array(ncum)
@@ -331,4 +330,3 @@ for x in weights[4:5]:
 wfile1.close()
 wfile2.close()
 wfile3.close()
-
