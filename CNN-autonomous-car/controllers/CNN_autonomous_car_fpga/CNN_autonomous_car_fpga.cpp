@@ -32,7 +32,7 @@
 #define POOL 1
 #define LINEAR 2
 
-#define PARALLEL_MODE 0
+#define VERBOSE 1
 
 const float INPUT_MEANS[] = {75.5759, 80.3124, 82.3455};
 const float INPUT_STDS[] = {41.0884, 50.9617, 55.9314};
@@ -43,9 +43,11 @@ typedef int32_t fixed_point_t;
 
 using namespace std;
 
-static max_file_t *max_file;
-static max_engine_t *max_engine;
+// DFE
+static max_file_t *maxFile;
+static max_engine_t *maxEngine;
 
+// Network data
 static vector<fixed_point_t> weights;
 static vector<double> bias;
 
@@ -53,14 +55,18 @@ static vector<fixed_point_t> inputFixed;
 static int cnnOutputSize = ConvNetwork_OS_LINEAR2 + ConvNetwork_OUT_PAD;
 static vector<fixed_point_t> cnnOutput(cnnOutputSize);
 
-static vector<int> layer_types = {CONV, POOL, CONV,   POOL,
-                                  CONV, POOL, LINEAR, LINEAR};
-static vector<int> layers = {0, 0, 1, 1, 2, 2, 0, 1};
-static vector<int> conv_layers = {16, 32, 64};
-static vector<int> linear_layers_neurons = {500, 2};
-static vector<int> linear_layers_weights = {19456, 500};
+// Time
+static double simTime = 0;
+static double realTime = 0;
+static double stepTime = 0;
+static double imgTime = 0;
+static double netAccTime = 0;
 
 WbDeviceTag camera;
+
+double elapsed_time(struct timeval start, struct timeval end) {
+  return (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
+}
 
 float fixedpt_to_float(fixed_point_t input) {
   return (float)input / (float)(1 << FIXED_POINT_FRACTIONAL_BITS);
@@ -120,11 +126,12 @@ vector<fixed_point_t> transpose_weights(vector<fixed_point_t> linearWeights,
 }
 
 void dfe_init() {
+  printf("Reading text files for network parameters.\n");
   load_weights();
 
   printf("Loading engine!\n");
-  max_file = ConvNetwork_init();
-  max_engine = max_load(max_file, "*");
+  maxFile = ConvNetwork_init();
+  maxEngine = max_load(maxFile, "*");
   printf("Engine loaded!\n");
 
   printf("Loading network parameters into DFE memory.\n");
@@ -168,8 +175,8 @@ void dfe_init() {
 
   // LMEM data must be a multiple of burst size (192 bytes)
   int paddingToAdd =
-      (max_get_burst_size(max_file, NULL) -
-       (fWeights1.size() * 4 % max_get_burst_size(max_file, NULL))) /
+      (max_get_burst_size(maxFile, NULL) -
+       (fWeights1.size() * 4 % max_get_burst_size(maxFile, NULL))) /
       4;
   for (int i = 0; i < paddingToAdd; i++)
     fWeights1.push_back(0);
@@ -181,42 +188,42 @@ void dfe_init() {
   memoryActions.param_size = fWeights1.size();
   memoryActions.instream_fromcpu = fWeights1.data();
 
-  ConvNetwork_writeLMem_run(max_engine, &memoryActions);
+  ConvNetwork_writeLMem_run(maxEngine, &memoryActions);
   printf("Memory loaded.\n");
 }
 
 void process_new_image() {
-  int input_size =
+  int inputSize =
       ConvNetwork_IC_CONV1 * ConvNetwork_HT_CONV1 * ConvNetwork_WT_CONV1;
 
   // get camera image
-  const unsigned char *input_char = wb_camera_get_image(camera);
+  const unsigned char *inputChar = wb_camera_get_image(camera);
   inputFixed.clear();
   // normalize input image
-  for (int i = 0; i < input_size / 3; i++) {
+  for (int i = 0; i < inputSize / 3; i++) {
     int idx = 4 * ((floor(i / 320)) * (320) + (i % 320)) + 2;
-    float px_value = input_char[idx];
+    float pxValue = inputChar[idx];
     inputFixed.push_back(
-        float_to_fixedpt((px_value - INPUT_MEANS[0]) / INPUT_STDS[0]));
+        float_to_fixedpt((pxValue - INPUT_MEANS[0]) / INPUT_STDS[0]));
   }
-  for (int i = input_size / 3; i < 2 * input_size / 3; i++) {
-    int idx = 4 * ((floor((i - input_size / 3) / 320)) * (320) +
-                   ((i - input_size / 3) % 320)) +
+  for (int i = inputSize / 3; i < 2 * inputSize / 3; i++) {
+    int idx = 4 * ((floor((i - inputSize / 3) / 320)) * (320) +
+                   ((i - inputSize / 3) % 320)) +
               1;
-    float px_value = input_char[idx];
+    float pxValue = inputChar[idx];
     inputFixed.push_back(
-        float_to_fixedpt((px_value - INPUT_MEANS[1]) / INPUT_STDS[1]));
+        float_to_fixedpt((pxValue - INPUT_MEANS[1]) / INPUT_STDS[1]));
   }
-  for (int i = 2 * input_size / 3; i < input_size; i++) {
-    int idx = 4 * ((floor((i - 2 * input_size / 3) / 320)) * (320) +
-                   ((i - 2 * input_size / 3) % 320));
-    float px_value = input_char[idx];
+  for (int i = 2 * inputSize / 3; i < inputSize; i++) {
+    int idx = 4 * ((floor((i - 2 * inputSize / 3) / 320)) * (320) +
+                   ((i - 2 * inputSize / 3) % 320));
+    float pxValue = inputChar[idx];
     inputFixed.push_back(
-        float_to_fixedpt((px_value - INPUT_MEANS[2]) / INPUT_STDS[2]));
+        float_to_fixedpt((pxValue - INPUT_MEANS[2]) / INPUT_STDS[2]));
   }
 }
 
-void network_only_evaluation(vector<fixed_point_t> input) {
+void set_dfe_actions(ConvNetwork_actions_t *actions) {
   int biasSize1 = ConvNetwork_OC_CONV1;
   int biasSize2 = ConvNetwork_OC_CONV2;
   int biasSize3 = ConvNetwork_OC_CONV3;
@@ -235,77 +242,38 @@ void network_only_evaluation(vector<fixed_point_t> input) {
   vector<double> fBias4(bLast3, bLast4);
   vector<double> fBias5(bLast4, bLast5);
 
-  ConvNetwork_actions_t actions;
-
-  actions.instream_inputfromcpu = input.data();
-  actions.inmem_CONVOLUTION_LAYER1_biasMem = fBias1.data();
-  actions.inmem_CONVOLUTION_LAYER2_biasMem = fBias2.data();
-  actions.inmem_CONVOLUTION_LAYER3_biasMem = fBias3.data();
-  actions.inmem_LINEAR_LAYER1_biasMem = fBias4.data();
-  actions.inmem_LINEAR_LAYER2_biasMem = fBias5.data();
-  actions.outstream_outputtocpu = (fixed_point_t *)cnnOutput.data();
-
-  struct timeval start;
-  gettimeofday(&start, NULL);
-
-  ConvNetwork_run(max_engine, &actions);
-
-  struct timeval end;
-  gettimeofday(&end, NULL);
-  float acc_time =
-      (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
-  // printf("Run time = %f\n", acc_time);
+  actions->instream_inputfromcpu = inputFixed.data();
+  actions->inmem_CONVOLUTION_LAYER1_biasMem = fBias1.data();
+  actions->inmem_CONVOLUTION_LAYER2_biasMem = fBias2.data();
+  actions->inmem_CONVOLUTION_LAYER3_biasMem = fBias3.data();
+  actions->inmem_LINEAR_LAYER1_biasMem = fBias4.data();
+  actions->inmem_LINEAR_LAYER2_biasMem = fBias5.data();
+  actions->outstream_outputtocpu = (fixed_point_t *)cnnOutput.data();
 }
 
-void network_image_evaluation(vector<fixed_point_t> input) {
-  int biasSize1 = ConvNetwork_OC_CONV1;
-  int biasSize2 = ConvNetwork_OC_CONV2;
-  int biasSize3 = ConvNetwork_OC_CONV3;
-  int biasSize4 = ConvNetwork_OS_LINEAR1;
-  int biasSize5 = ConvNetwork_OS_LINEAR2;
-  auto bFirst = bias.begin();
-  auto bLast1 = bias.begin() + biasSize1;
-  auto bLast2 = bias.begin() + biasSize1 + biasSize2;
-  auto bLast3 = bias.begin() + biasSize1 + biasSize2 + biasSize3;
-  auto bLast4 = bias.begin() + biasSize1 + biasSize2 + biasSize3 + biasSize4;
-  auto bLast5 =
-      bias.begin() + biasSize1 + biasSize2 + biasSize3 + biasSize4 + biasSize5;
-  vector<double> fBias1(bFirst, bLast1);
-  vector<double> fBias2(bLast1, bLast2);
-  vector<double> fBias3(bLast2, bLast3);
-  vector<double> fBias4(bLast3, bLast4);
-  vector<double> fBias5(bLast4, bLast5);
-
-  ConvNetwork_actions_t actions;
-
-  actions.instream_inputfromcpu = input.data();
-  actions.inmem_CONVOLUTION_LAYER1_biasMem = fBias1.data();
-  actions.inmem_CONVOLUTION_LAYER2_biasMem = fBias2.data();
-  actions.inmem_CONVOLUTION_LAYER3_biasMem = fBias3.data();
-  actions.inmem_LINEAR_LAYER1_biasMem = fBias4.data();
-  actions.inmem_LINEAR_LAYER2_biasMem = fBias5.data();
-  actions.outstream_outputtocpu = (fixed_point_t *)cnnOutput.data();
-
-  struct timeval start;
-  gettimeofday(&start, NULL);
-
-  max_run_t *cnn_run;
-  cnn_run = ConvNetwork_run_nonblock(max_engine, &actions);
-  process_new_image();
-  max_wait(cnn_run);
-
-  struct timeval end;
-  gettimeofday(&end, NULL);
-  float acc_time =
-      (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
-  printf("Run time = %f\n", acc_time);
+void display_logs(const double *carPosition, int stepCount, int period) {
+  if (stepCount % period == 0 || stepCount == 1) {
+    printf("### Step number %d ###\n", stepCount);
+    printf("Car position = %f %f %f\n", carPosition[0], carPosition[1],
+           carPosition[2]);
+    printf("Real elapsed time = %f\n", realTime);
+    printf("Simulation elapsed time = %f\n", simTime);
+    printf("Mean simulation speed ratio = %f\n", simTime / realTime);
+    printf("Mean step duration (real time) = %f\n\n", realTime / stepCount);
+  }
 }
 
 int main(int argc, const char *argv[]) {
-  // load DFE with max file and LMEM content
-
+  // Get mode argument to choose parallelization process to apply
   if (argc != 2) {
-    cerr << "Exactly one argument must be passed to the controller.\n";
+    fprintf(
+        stderr,
+        "WARNING: Exactly one argument must be passed to the controller.\n");
+    return 1;
+  }
+
+  if (argv[1] && !argv[1][0]) {
+    fprintf(stderr, "WARNING: Mode argument cannot be empty.\n");
     return 1;
   }
 
@@ -313,7 +281,9 @@ int main(int argc, const char *argv[]) {
   stringstream s(argv[1]);
   s >> parallelMode;
 
+  // load DFE with max file and LMEM content
   dfe_init();
+  max_run_t *cnnRun;
 
   // create the driver instance.
   wbu_driver_init();
@@ -326,80 +296,21 @@ int main(int argc, const char *argv[]) {
   camera = wb_robot_get_device("camera");
   wb_camera_enable(camera, timeStep);
 
-  // int exit;
-  int count = 0;
-  double sim_time = 0;
-  double real_time = 0;
-  double step_time = 0;
-  double img_time = 0;
+  // time variables
+  struct timeval simStart;
+  struct timeval stepEnd;
+  gettimeofday(&simStart, NULL);
 
-  struct timeval sim_start;
-  gettimeofday(&sim_start, NULL);
+  int stepCount = 0;
 
-  /****** PARALLEL CNN & IMAGE PROCESSING ******/
-  if (parallelMode == 0) {
-    while (wb_robot_step(timeStep) != -1) {
-      const double *car_position = wb_supervisor_node_get_position(car);
-
-      struct timeval step_start;
-      gettimeofday(&step_start, NULL);
-
-      // compute forward propagation from input image + parallelize with image
-      // processing
-      if (count != 0) {
-        network_image_evaluation(inputFixed);
-      } else
-        process_new_image();
-
-      float steering = 0;
-      float speed = 0;
-
-      steering =
-          fixedpt_to_float(cnnOutput[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
-      speed = fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
-      // printf("steering = %f\n", steering);
-      // printf("speed = %f\n\n", speed);
-
-      // time informations
-      struct timeval step_end;
-      gettimeofday(&step_end, NULL);
-
-      sim_time = wb_robot_get_time();
-      real_time = (step_end.tv_sec - sim_start.tv_sec) +
-                  (step_end.tv_usec - sim_start.tv_usec) * 1e-6;
-      step_time = (step_end.tv_sec - step_start.tv_sec) +
-                  (step_end.tv_usec - step_start.tv_usec) * 1e-6;
-
-      count++;
-      if (count % 300 == 0 || count == 1) {
-        printf("position = %f %f %f\n", car_position[0], car_position[1],
-               car_position[2]);
-        printf("real time = %f\n", real_time);
-        printf("sim time = %f, sim ratio = %f\n", sim_time,
-               sim_time / real_time);
-        printf("step time = %f\n", step_time);
-        printf("mean time = %f\n\n", real_time / count);
-      }
-
-      // quit simulation after 60s (optional)
-      if (sim_time > 120) {
-        wb_supervisor_simulation_quit(0);
-      }
-
-      if (count != 1) {
-        // Apply steering and speed values to car
-        wbu_driver_set_cruising_speed(speed);
-        wbu_driver_set_steering_angle(steering * 1.7);
-      }
-    }
-  }
-
-  /****** PARALLEL CNN & WEBOTS RENDERING ******/
-  else if (parallelMode == 1) {
+  switch (parallelMode) {
+  /****** MODE 0 => (CNN + IMAGE PROCESSING) // WEBOTS RENDERING ******/
+  case 0:
+    // mandatory initial step
     wb_robot_step(timeStep);
 
     do {
-      const double *car_position = wb_supervisor_node_get_position(car);
+      const double *carPosition = wb_supervisor_node_get_position(car);
 
       if (wb_robot_step_begin(timeStep) == -1)
         break;
@@ -407,60 +318,170 @@ int main(int argc, const char *argv[]) {
       struct timeval step_start;
       gettimeofday(&step_start, NULL);
 
+      // get and normalize new image
       process_new_image();
 
       struct timeval img_end;
       gettimeofday(&img_end, NULL);
 
-      network_only_evaluation(inputFixed);
+      ConvNetwork_actions_t actions;
+      set_dfe_actions(&actions);
 
-      float steering = 0;
-      float speed = 0;
+      struct timeval start;
+      gettimeofday(&start, NULL);
 
-      steering =
+      // perform DFE inference
+      ConvNetwork_run(maxEngine, &actions);
+
+      struct timeval end;
+      gettimeofday(&end, NULL);
+      float cnn_time = elapsed_time(start, end);
+      // printf("Run time = %f\n", cnn_time);
+
+      float steering =
           fixedpt_to_float(cnnOutput[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
-      speed = fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
+      float speed =
+          fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
 
       // printf("steering = %f\n", steering);
       // printf("speed = %f\n\n", speed);
 
-      // time informations
-      struct timeval step_end;
-      gettimeofday(&step_end, NULL);
-
-      sim_time = wb_robot_get_time();
-      real_time = (step_end.tv_sec - sim_start.tv_sec) +
-                  (step_end.tv_usec - sim_start.tv_usec) * 1e-6;
-      step_time = (step_end.tv_sec - step_start.tv_sec) +
-                  (step_end.tv_usec - step_start.tv_usec) * 1e-6;
-      img_time = (img_end.tv_sec - step_start.tv_sec) +
-                 (img_end.tv_usec - step_start.tv_usec) * 1e-6;
-
-      count++;
-      if (count % 300 == 0 || count == 1) {
-        printf("position = %f %f %f\n", car_position[0], car_position[1],
-               car_position[2]);
-        printf("real time = %f\n", real_time);
-        printf("sim time = %f, sim ratio = %f\n", sim_time,
-               sim_time / real_time);
-        printf("step time = %f\n", step_time);
-        printf("img time = %f\n", img_time);
-        printf("mean time = %f\n\n", real_time / count);
-      }
-
-      // quit simulation after 120s (optional)
-      if (sim_time > 120) {
-        wb_supervisor_simulation_quit(0);
-      }
-
-      // Apply steering and speed values to car
+      // apply steering and speed values to car
       wbu_driver_set_cruising_speed(speed);
       wbu_driver_set_steering_angle(steering * 1.7);
 
+      // time information
+      gettimeofday(&stepEnd, NULL);
+      simTime = wb_robot_get_time();
+      realTime = elapsed_time(simStart, stepEnd);
+      imgTime = elapsed_time(step_start, img_end);
+      stepTime = elapsed_time(step_start, stepEnd);
+      netAccTime += stepTime - imgTime;
+
+      stepCount++;
+
+#if VERBOSE
+      display_logs(carPosition, stepCount, 300);
+      if (stepCount % 300 == 0 || stepCount == 1) {
+        printf("mean network time = %f\n\n", netAccTime / stepCount);
+      }
+#endif
+
+      // quit simulation after 120s (optional)
+      if (simTime > 120) {
+        wb_supervisor_simulation_quit(0);
+      }
     } while (wb_robot_step_end() != -1);
-  } else
-    cerr << "This parallelization mode does not exist. Use either mode '0' or "
-            "'1'.\n";
+    break;
+
+  /****** MODE 1 =>  (CNN + WEBOTS RENDERING) // IMAGE PROCESSING ******/
+  case 1:
+    while (wb_robot_step(timeStep) != -1) {
+      // no CNN inference at first step
+      if (stepCount == 0)
+        process_new_image();
+      else {
+        ConvNetwork_actions_t actions;
+        set_dfe_actions(&actions);
+
+        struct timeval start;
+        gettimeofday(&start, NULL);
+
+        // DFE inference parallelized with image processing
+        cnnRun = ConvNetwork_run_nonblock(maxEngine, &actions);
+        process_new_image();
+        max_wait(cnnRun);
+
+        struct timeval end;
+        gettimeofday(&end, NULL);
+        float cnn_time = elapsed_time(start, end);
+        // printf("Run time = %f\n", cnn_time);
+
+        float steering =
+            fixedpt_to_float(cnnOutput[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
+        float speed =
+            fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
+
+        // printf("steering = %f\n", steering);
+        // printf("speed = %f\n\n", speed);
+
+        // apply steering and speed values to car
+        wbu_driver_set_cruising_speed(speed);
+        wbu_driver_set_steering_angle(steering * 1.7);
+      }
+
+      // time information
+      gettimeofday(&stepEnd, NULL);
+      simTime = wb_robot_get_time();
+      realTime = elapsed_time(simStart, stepEnd);
+
+      stepCount++;
+
+#if VERBOSE
+      const double *carPosition = wb_supervisor_node_get_position(car);
+      display_logs(carPosition, stepCount, 300);
+#endif
+
+      // quit simulation after 120s (optional)
+      if (simTime > 120) {
+        wb_supervisor_simulation_quit(0);
+      }
+    }
+    break;
+
+  /****** MODE 2 => (WEBOTS RENDERING + IMAGE PROCESSING) // CNN ******/
+  case 2:
+    while (wb_robot_step(timeStep) != -1) {
+
+      // get and normalize new image
+      process_new_image();
+
+      if (stepCount != 0) {
+        // wait for DFE to finish before applying driving values
+        max_wait(cnnRun);
+
+        float steering =
+            fixedpt_to_float(cnnOutput[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
+        float speed =
+            fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
+        // printf("steering = %f\n", steering);
+        // printf("speed = %f\n\n", speed);
+
+        // apply steering and speed values to car
+        wbu_driver_set_cruising_speed(speed);
+        wbu_driver_set_steering_angle(steering * 1.7);
+      }
+
+      ConvNetwork_actions_t actions;
+      set_dfe_actions(&actions);
+      cnnRun = ConvNetwork_run_nonblock(maxEngine, &actions);
+
+      // time information
+      gettimeofday(&stepEnd, NULL);
+      simTime = wb_robot_get_time();
+      realTime = elapsed_time(simStart, stepEnd);
+
+      stepCount++;
+
+#if VERBOSE
+      const double *carPosition = wb_supervisor_node_get_position(car);
+      display_logs(carPosition, stepCount, 300);
+#endif
+
+      // quit simulation after 120s (optional)
+      if (simTime > 120) {
+        wb_supervisor_simulation_quit(0);
+      }
+    }
+    break;
+
+  default:
+    fprintf(stderr,
+            "This parallelization mode does not exist. Use either mode '0',  "
+            "'1' or '2'.\n");
+    return 1;
+    break;
+  }
 
   wbu_driver_cleanup();
   return 0;
