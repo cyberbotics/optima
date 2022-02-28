@@ -38,6 +38,10 @@ typedef int64_t fixed_point_t;
 
 using namespace std;
 
+double elapsed_time(struct timeval start, struct timeval end) {
+  return (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
+}
+
 float fixedpt_to_float(fixed_point_t input) {
   return (float)input / (float)(1 << FIXED_POINT_FRACTIONAL_BITS);
 }
@@ -433,15 +437,15 @@ int main(void) {
   printf("Weights and biases successfully loaded !\n");
 
   // int exit;
-  int count = 0;
-  double sim_time = 0;
-  double real_time = 0;
+  int stepCount = 0;
+  double simTime = 0;
+  double realTime = 0;
 
-  struct timeval sim_start;
-  gettimeofday(&sim_start, NULL);
+  struct timeval simStart;
+  gettimeofday(&simStart, NULL);
 
   wb_robot_step(timeStep);
- 
+
   do {
     if (wb_robot_step_begin(timeStep) == -1)
       break;
@@ -455,24 +459,24 @@ int main(void) {
     // normalize input image
     for (int i = 0; i < input_size / 3; i++) {
       int idx = 4 * ((floor(i / 320)) * (320) + (i % 320)) + 2;
-      float px_value = input_char[idx];
+      float pxValue = input_char[idx];
       inputFixed.push_back(
-          float_to_fixedpt((px_value - INPUT_MEANS[0]) / INPUT_STDS[0]));
+          float_to_fixedpt((pxValue - INPUT_MEANS[0]) / INPUT_STDS[0]));
     }
     for (int i = input_size / 3; i < 2 * input_size / 3; i++) {
       int idx = 4 * ((floor((i - input_size / 3) / 320)) * (320) +
                      ((i - input_size / 3) % 320)) +
                 1;
-      float px_value = input_char[idx];
+      float pxValue = input_char[idx];
       inputFixed.push_back(
-          float_to_fixedpt((px_value - INPUT_MEANS[1]) / INPUT_STDS[1]));
+          float_to_fixedpt((pxValue - INPUT_MEANS[1]) / INPUT_STDS[1]));
     }
     for (int i = 2 * input_size / 3; i < input_size; i++) {
       int idx = 4 * ((floor((i - 2 * input_size / 3) / 320)) * (320) +
                      ((i - 2 * input_size / 3) % 320));
-      float px_value = input_char[idx];
+      float pxValue = input_char[idx];
       inputFixed.push_back(
-          float_to_fixedpt((px_value - INPUT_MEANS[2]) / INPUT_STDS[2]));
+          float_to_fixedpt((pxValue - INPUT_MEANS[2]) / INPUT_STDS[2]));
     }
 
     // compute forward propagation from input image
@@ -488,22 +492,23 @@ int main(void) {
     struct timeval now;
     gettimeofday(&now, NULL);
 
-    sim_time = wb_robot_get_time();
-    real_time = (now.tv_sec - sim_start.tv_sec) +
-                (now.tv_usec - sim_start.tv_usec) * 1e-6;
+    simTime = wb_robot_get_time();
+    realTime = elapsed_time(simStart, now);
 
-    count++;
-    if (int(sim_time) % 20 <= 0.01) {
-      printf("real_time = %f\n", real_time);
-      printf("sim time = %f, sim ratio = %f\n", sim_time, sim_time / real_time);
-      printf("mean time = %f\n", real_time / count);
+    stepCount++;
+    if (stepCount % 300 == 0 || stepCount == 1) {
+      printf("### Step number %d ###\n", stepCount);
+      printf("Real elapsed time = %f\n", realTime);
+      printf("Simulation elapsed time = %f\n", simTime);
+      printf("Mean simulation speed ratio = %f\n", simTime / realTime);
+      printf("Mean step duration (real time) = %f\n\n", realTime / stepCount);
     }
 
-    // quit simulation after 60s (optional)
-    if (sim_time > 60) {
+    // quit simulation after 120s (optional)
+    if (simTime > 120) {
       wb_supervisor_simulation_quit(0);
     }
-    
+
     // Apply steering and speed values to car
     wbu_driver_set_cruising_speed(speed);
     wbu_driver_set_steering_angle(steering * 1.7);
