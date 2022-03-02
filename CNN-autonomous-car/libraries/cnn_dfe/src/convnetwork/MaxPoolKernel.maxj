@@ -33,7 +33,7 @@ public class MaxPoolKernel extends Kernel {
 
     this.inVec = new DFEVectorType<DFEVar>(fixedPtType, nFactor);
 
-	CounterChain chain = control.count.makeCounterChain();
+    CounterChain chain = control.count.makeCounterChain();
     DFEVar ht = chain.addCounter(height, 1);
     DFEVar wt = chain.addCounter(width, 1);
     if(pFactor/nFactor != 1){chain.addCounter(pFactor/nFactor, 1);}
