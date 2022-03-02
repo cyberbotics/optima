@@ -1,0 +1,82 @@
+/**
+ * Kernel name: LinearLayer
+ * Summary:
+ * 	 Linear layer of the network.
+ */
+
+package convnetwork;
+
+import utils.DotProductKernel;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Mem.RamWriteMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.KernelMath;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+import com.maxeler.maxcompiler.v2.utils.MathUtils;
+
+public class LinearLayerKernel extends Kernel {
+
+  public static final String IN_NAME = "input";
+  public static final String W_NAME = "weights";
+  public static final String OUT_NAME = "output";
+  public static final String INNBELEM_NAME = "innbelem";
+  public static final String OUTNBELEM_NAME = "outnbelem";
+  
+  DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
+
+  private final DFEVectorType<DFEVar>  inVec;
+  
+  public LinearLayerKernel(KernelParameters params, int inVecSize, int inNbVec, int outSize, boolean lastLayer, int outPadding){
+    super(params);
+
+    this.inVec = new DFEVectorType<DFEVar>(fixedPtType, inVecSize);
+
+    DFEVar inNbElem = io.scalarInput(INNBELEM_NAME, dfeUInt(MathUtils.bitsToAddress(inNbVec+1))); 
+    DFEVar outNbElem = io.scalarInput(OUTNBELEM_NAME, dfeUInt(MathUtils.bitsToAddress(outSize+1)));
+
+    CounterChain chain = control.count.makeCounterChain();
+    DFEVar c = chain.addCounter(outNbElem, 1);
+    DFEVar h = chain.addCounter(outNbElem, 1);
+    DFEVar w = chain.addCounter(inNbElem, 1);
+
+    DFEVector<DFEVar> weights = io.input(W_NAME, inVec);
+    Memory<DFEVar> biasMem = mem.alloc(dfeFloat(8,24), outSize+1);
+    biasMem.mapToCPU("biasMem");
+
+    DFEVector<DFEVar> input = io.input(IN_NAME, inVec, h.eq(0) & c.eq(0));
+    Memory<DFEVector<DFEVar>> iMem =  mem.alloc(inVec, inNbVec+1);
+    DFEVector<DFEVar> inPort = iMem.port(w, input, h.eq(0) & c.eq(0), RamWriteMode.WRITE_FIRST);
+
+    // Perform dot product between input and weights vector
+    DotProductKernel dpk = new DotProductKernel(getKernel(), inVecSize, fixedPtType);
+    dpk.setInputs(inPort, weights);
+    DFEVar dotProd = dpk.getOutput();
+
+    // Add all corresponding dot products together
+    DFEVar carriedSum = fixedPtType.newInstance(this);
+    DFEVar sum = (w.eq(0)) ? constant.var(0).cast(fixedPtType) : carriedSum;
+    DFEVar newSum = sum + dotProd;	
+    carriedSum.connect(stream.offset(newSum, -1));
+
+    DFEVar bias = biasMem.read(h).cast(fixedPtType);
+    DFEVar s = newSum + bias;
+
+    DFEVar x = lastLayer == true ? s : elu(s);
+
+    DFEVar outEnable = w.eq(inNbElem - 1);
+    DFEVar paddingEnable = lastLayer == true ? c.eq(1) & w < outPadding : w < 0; // for last layer 2 padding values
+    io.output(OUT_NAME, x, fixedPtType, outEnable | paddingEnable);
+  }
+  
+  public DFEVar elu(DFEVar input) {
+    DFEVar Result = input > 0 ? input : KernelMath.exp(input, fixedPtType) - 1;
+    return Result;
+  }
+}

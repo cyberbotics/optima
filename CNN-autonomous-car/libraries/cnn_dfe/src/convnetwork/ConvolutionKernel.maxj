@@ -1,0 +1,105 @@
+/**
+ * Kernel name: Convolution
+ * Summary:
+ * 	 Convolution layer of the network.
+ */
+
+package convnetwork;
+
+import utils.DotProductKernel;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Mem.RamWriteMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+import com.maxeler.maxcompiler.v2.utils.MathUtils;
+
+public class ConvolutionKernel extends Kernel {
+	
+	public static final String IN_NAME = "input";
+	public static final String W_NAME = "weight";
+	public static final String OUT_NAME = "output";
+	public static final String WIDTH_NAME = "width";
+	public static final String HEIGHT_NAME = "height";
+	public static final String ICHANNEL_NAME = "ichannel";
+	public static final String OCHANNEL_NAME = "ochannel";
+	
+	DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
+	
+	private final DFEVectorType<DFEVar> inVec, windowVec, outVec;
+	
+	public ConvolutionKernel(KernelParameters parameters, int width, int height, int ichannel, int ochannel, int windowSize, int pFactor) {
+		super(parameters);
+		
+		this.inVec = new DFEVectorType<DFEVar>(fixedPtType, pFactor * windowSize);
+		this.windowVec = new DFEVectorType<DFEVar>(fixedPtType, windowSize);
+		this.outVec = new DFEVectorType<DFEVar>(fixedPtType, pFactor);
+		
+		DFEVar inWidth = io.scalarInput(WIDTH_NAME, dfeUInt(MathUtils.bitsToAddress(width+1)));
+        DFEVar inHeight = io.scalarInput(HEIGHT_NAME, dfeUInt(MathUtils.bitsToAddress(height+1)));
+		DFEVar inChannels = io.scalarInput(ICHANNEL_NAME, dfeUInt(MathUtils.bitsToAddress(ichannel+1))); 
+        DFEVar outChannels = io.scalarInput(OCHANNEL_NAME, dfeUInt(MathUtils.bitsToAddress(ochannel+1)));
+        
+        int channelSize = width * height;
+        
+        CounterChain chain = control.count.makeCounterChain();
+		DFEVar ic = chain.addCounter(inChannels, 1);
+		DFEVar oc = chain.addCounter(outChannels, 1);
+        DFEVar ht = chain.addCounter(inHeight, 1);
+        DFEVar wt = chain.addCounter(inWidth, 1);
+        
+        DFEVar input = io.input(IN_NAME, fixedPtType, oc.eq(0));
+		DFEVar inAddress = ht.cast(dfeUInt(32)) * width + wt.cast(dfeUInt(32));
+		Memory<DFEVar>iMem = mem.alloc(fixedPtType, channelSize);
+		DFEVar inPort = iMem.port(inAddress.cast(dfeUInt(MathUtils.bitsToAddress((int)channelSize))), input, oc.eq(0), RamWriteMode.WRITE_FIRST);
+        
+		DFEVector<DFEVar> weights = io.input(W_NAME, inVec, ht.eq(1) & wt.eq(1)); 
+		
+		// Bug with duplicated mapped memories -> copy content to second memory
+		Memory<DFEVar> biasMem = mem.alloc(dfeFloat(8,24), ochannel*pFactor+1);
+		biasMem.mapToCPU("biasMem");
+		DFEVar biasCopy = biasMem.read(wt.cast(dfeUInt(MathUtils.bitsToAddress(pFactor*ochannel+1))));
+		Memory<DFEVar> biasMem2 = mem.alloc(dfeFloat(8,24), ochannel*pFactor+1);
+		biasMem2.write(wt.cast(dfeUInt(MathUtils.bitsToAddress(pFactor*ochannel+1))), biasCopy, wt < ochannel*pFactor);
+		
+	    DFEVector<DFEVar> inputWindow = windowVec.newInstance(this);
+	    int i = 0;
+	    for ( int x = -1; x <= 1; x++) {
+	    	for ( int y = -1; y <= 1; y++) {
+	    		inputWindow[i++] <== stream.offset(inPort, x * width + y);
+	    	}
+	    }
+	    
+	    DFEVector<DFEVar> output = outVec.newInstance(getKernel());
+	    for(int p = 0; p < pFactor; p++){
+	    	DFEVector<DFEVar> currWeights = windowVec.newInstance(getKernel());
+	    	for (int c = 0; c < windowSize; c++)
+	    		currWeights[c] <== weights[p*windowSize + c];
+	    	
+	    	DotProductKernel dpk = new DotProductKernel(getKernel(), windowSize, fixedPtType);
+	        dpk.setInputs(inputWindow, currWeights);
+	        DFEVar dotProd = dpk.getOutput();
+	        
+	        // Add all corresponding dot products together
+	        DFEVar carriedSum = fixedPtType.newInstance(this);
+	        DFEVar sum = (ic.eq(0)) ? constant.var(0).cast(fixedPtType) : carriedSum;
+	        DFEVar newSum = sum + dotProd;	
+	        int offset = -width*height*ochannel;
+	        carriedSum.connect(stream.offset(newSum, offset));
+	        
+	        DFEVar biasAdress = oc.cast(dfeUInt(32)) * pFactor + p;
+	        DFEVar bias = biasMem2.read(biasAdress.cast(dfeUInt(MathUtils.bitsToAddress(pFactor*ochannel+1)))).cast(fixedPtType);
+	        
+		    output[p] <== newSum + bias;
+		}
+	    
+	    DFEVar outEnable = ic.eq(inChannels-1) & wt > 0 & ht > 0 & wt < (inWidth-1) & ht < (inHeight-1);
+	    io.output(OUT_NAME, outVec, outEnable).connect(output);
+	}
+}
