@@ -55,6 +55,7 @@ The `CNN-autonomous-car` directory contains the Webots project of the self-drivi
 The training and testing worlds are both located in `CNN-autonomous-car/worlds`.
 
 The different controller source codes are located in `CNN-autonomous-car/controllers`. The available controllers are the following.
+* **training_track_driving**: this controller is used to follow the train track using the trajectory planning data.
 * **CNN_autonomous_car_cpu_float**: this controller contains the naive version of the neural network with floating point represention to drive the car. 
 * **CNN_autonomous_car_cpu_fixed**: this controller is the optimized CPU version of the neural network with fixed point representation and multithreading to drive the car.
 * **CNN_autonomous_car_fpga**: this controller uses the _cnn_dfe_ library to run the neural network on a DFE. This controller has 3 different loop optimization modes. The mode must be passed through the controllerArgs field in `CNN-autonomous-car/worlds/autonomous_car_test.wbt`.
