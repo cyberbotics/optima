@@ -19,51 +19,51 @@ import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEFix.SignMode;
 import com.maxeler.maxcompiler.v2.utils.MathUtils;
 
 public class TransposeKernel extends Kernel {
-	
-	public static final String IN_NAME = "input";
-	public static final String OUT_NAME = "output";
-	public static final String CPU_NAME = "cpu";
-	public static final String WIDTH_NAME = "width";
-	public static final String HEIGHT_NAME = "height";
-	
-	DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
-	
-	public TransposeKernel(KernelParameters parameters, int channelSize, int pFactor) {
-		super(parameters);
-		
-		if(pFactor == 1){
-			DFEVar input = io.input(IN_NAME, fixedPtType);
-			io.output(OUT_NAME, input, fixedPtType);
-		}
-		else{
-			int dataSize = channelSize * pFactor;
-			// Bug with 2^15 bits memories -> double the size for second transpose kernel
-			int memorySize = channelSize == 1404 ? dataSize * 2 : dataSize;
-			int addrBits = MathUtils.bitsToAddress(memorySize);
-			
-			CounterChain chain = control.count.makeCounterChain();
-			DFEVar mode = chain.addCounter(2, 1);
-			DFEVar outter = chain.addCounter(pFactor, 1);
-			chain.addCounter(channelSize, 1);
-			
-			Count.Params inParams = control.count.makeParams(addrBits).withMax(dataSize);
-			Counter inCounter = control.count.makeCounter(inParams);
-			DFEVar address = inCounter.getCount();
-			
-			DFEVar bool = mode.eq(1) ? constant.var(true) : constant.var(false);
-			
-			DFEVar input = io.input(IN_NAME, fixedPtType, ~bool);
-			Memory<DFEVar> inputMem = mem.alloc(fixedPtType, memorySize);
-			inputMem.write(address.cast(dfeUInt(addrBits)), input, ~bool);
-			
-			Count.Params outParams = control.count.makeParams(addrBits).withMax(dataSize).withWrapMode(WrapMode.MODULO_MAX_OF_COUNT).withInc(pFactor).withEnable(bool);
-			Counter outCounter = control.count.makeCounter(outParams);
-			DFEVar outCount = outCounter.getCount();
-			
-			DFEVar outAddress = outCount.cast(dfeUInt(addrBits)) + outter.cast(dfeUInt(addrBits));
-			DFEVar output = inputMem.read(outAddress.cast(dfeUInt(addrBits)));
-		    
-			io.output(OUT_NAME, output, fixedPtType, bool);	
-		}
-	}
+  
+  public static final String IN_NAME = "input";
+  public static final String OUT_NAME = "output";
+  public static final String CPU_NAME = "cpu";
+  public static final String WIDTH_NAME = "width";
+  public static final String HEIGHT_NAME = "height";
+  
+  DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
+  
+  public TransposeKernel(KernelParameters parameters, int channelSize, int pFactor) {
+    super(parameters);
+    
+    if(pFactor == 1){
+      DFEVar input = io.input(IN_NAME, fixedPtType);
+      io.output(OUT_NAME, input, fixedPtType);
+    }
+    else{
+      int dataSize = channelSize * pFactor;
+      // Bug with 2^15 bits memories -> double the size for second transpose kernel
+      int memorySize = channelSize == 1404 ? dataSize * 2 : dataSize;
+      int addrBits = MathUtils.bitsToAddress(memorySize);
+      
+      CounterChain chain = control.count.makeCounterChain();
+      DFEVar mode = chain.addCounter(2, 1);
+      DFEVar outter = chain.addCounter(pFactor, 1);
+      chain.addCounter(channelSize, 1);
+      
+      Count.Params inParams = control.count.makeParams(addrBits).withMax(dataSize);
+      Counter inCounter = control.count.makeCounter(inParams);
+      DFEVar address = inCounter.getCount();
+      
+      DFEVar bool = mode.eq(1) ? constant.var(true) : constant.var(false);
+      
+      DFEVar input = io.input(IN_NAME, fixedPtType, ~bool);
+      Memory<DFEVar> inputMem = mem.alloc(fixedPtType, memorySize);
+      inputMem.write(address.cast(dfeUInt(addrBits)), input, ~bool);
+      
+      Count.Params outParams = control.count.makeParams(addrBits).withMax(dataSize).withWrapMode(WrapMode.MODULO_MAX_OF_COUNT).withInc(pFactor).withEnable(bool);
+      Counter outCounter = control.count.makeCounter(outParams);
+      DFEVar outCount = outCounter.getCount();
+      
+      DFEVar outAddress = outCount.cast(dfeUInt(addrBits)) + outter.cast(dfeUInt(addrBits));
+      DFEVar output = inputMem.read(outAddress.cast(dfeUInt(addrBits)));
+        
+      io.output(OUT_NAME, output, fixedPtType, bool);	
+    }
+  }
 }
