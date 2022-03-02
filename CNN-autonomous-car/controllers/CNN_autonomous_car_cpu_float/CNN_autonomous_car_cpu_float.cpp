@@ -1,7 +1,7 @@
 /**
  * Summary:
  *        Autonomous car controller to follow test track with front camera and
- * 				CNN. floating point version.
+ * CNN. floating point version.
  */
 
 #include <algorithm>
