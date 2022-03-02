@@ -27,7 +27,7 @@ public class MaxPoolKernel extends Kernel {
   DFEFix fixedPtType = dfeFix(16, 16, SignMode.TWOSCOMPLEMENT);
 
   private final DFEVectorType<DFEVar> inVec;
-	
+
   public MaxPoolKernel(KernelParameters parameters, int width, int height, int pFactor, int nFactor, boolean firstPool) {
     super(parameters);
 
@@ -46,17 +46,17 @@ public class MaxPoolKernel extends Kernel {
       max = input[i];
       for ( int x = 0; x <= 1; x++) {
         for ( int y = 0; y <= 1; y++) {
-	      DFEVector<DFEVar> offsetVec = stream.offset(input, x * width * pFactor/nFactor + y * pFactor/nFactor);
-		  max = offsetVec[i] > max ? offsetVec[i] : max;
-		}
-	  }
-	  activation[i] <== elu(max);
+          DFEVector<DFEVar> offsetVec = stream.offset(input, x * width * pFactor/nFactor + y * pFactor/nFactor);
+          max = offsetVec[i] > max ? offsetVec[i] : max;
+        }
+      }
+      activation[i] <== elu(max);
     }
 
     DFEVar outEnable = KernelMath.modulo(ht,2).eq(0) & KernelMath.modulo(wt,2).eq(0) & ~(ht.eq(height-1)) & ~(wt.eq(width-1));
     io.output(OUT_NAME, inVec, outEnable).connect(activation);
   }
-	
+
   public DFEVar elu(DFEVar input) {
     DFEVar Result = input > 0 ? input : KernelMath.exp(input, fixedPtType) - 1;
     return Result;
