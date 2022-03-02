@@ -362,20 +362,20 @@ int main(void) {
   load_weights();
   printf("Weights and biases successfully loaded !\n");
 
-  int exit;
-  int count = 0;
+  int stepCount = 0;
   double simTime = 0;
   double realTime = 0;
 
   struct timeval simStart;
   gettimeofday(&simStart, NULL);
 
-  exit = wb_robot_step(timeStep);
+  wb_robot_step(timeStep);
 
-  while (exit != -1) {
-    wb_robot_step_begin(
-        timeStep); // code between step_begin() and step_end() is computed in
-                   // parallel from Webots simulation to improve timing
+  do {
+    // code between step_begin() and step_end() is computed in parallel from
+    // Webots simulation to improve execution time
+    if (wb_robot_step_begin(timeStep) == -1)
+      break;
 
     struct timeval start;
     gettimeofday(&start, NULL);
@@ -437,12 +437,11 @@ int main(void) {
       wb_supervisor_simulation_quit(0);
     }
 
-    exit = wb_robot_step_end();
-
     // Apply steering and speed values to car
     wbu_driver_set_cruising_speed(speed);
     wbu_driver_set_steering_angle(steering * 1.7);
-  };
+
+  } while (wb_robot_step_end() != -1);
 
   wbu_driver_cleanup();
   return 0;
