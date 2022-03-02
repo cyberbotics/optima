@@ -29,36 +29,36 @@ public class MaxPoolKernel extends Kernel {
   private final DFEVectorType<DFEVar> inVec;
 	
   public MaxPoolKernel(KernelParameters parameters, int width, int height, int pFactor, int nFactor, boolean firstPool) {
-      super(parameters);
+    super(parameters);
 
-      this.inVec = new DFEVectorType<DFEVar>(fixedPtType, nFactor);
+    this.inVec = new DFEVectorType<DFEVar>(fixedPtType, nFactor);
 
-	  CounterChain chain = control.count.makeCounterChain();
-      DFEVar ht = chain.addCounter(height, 1);
-      DFEVar wt = chain.addCounter(width, 1);
-      if(pFactor/nFactor != 1){chain.addCounter(pFactor/nFactor, 1);}
+	CounterChain chain = control.count.makeCounterChain();
+    DFEVar ht = chain.addCounter(height, 1);
+    DFEVar wt = chain.addCounter(width, 1);
+    if(pFactor/nFactor != 1){chain.addCounter(pFactor/nFactor, 1);}
 
-      DFEVector<DFEVar> input = io.input(IN_NAME, inVec);
+    DFEVector<DFEVar> input = io.input(IN_NAME, inVec);
 
-      DFEVar max;
-      DFEVector<DFEVar> activation = inVec.newInstance(this);
-      for ( int i = 0; i < nFactor; i++){
-        max = input[i];
-        for ( int x = 0; x <= 1; x++) {
-          for ( int y = 0; y <= 1; y++) {
-		    DFEVector<DFEVar> offsetVec = stream.offset(input, x * width * pFactor/nFactor + y * pFactor/nFactor);
-			max = offsetVec[i] > max ? offsetVec[i] : max;
-		  }
-	    }
-	    activation[i] <== elu(max);
-      }
+    DFEVar max;
+    DFEVector<DFEVar> activation = inVec.newInstance(this);
+    for ( int i = 0; i < nFactor; i++){
+      max = input[i];
+      for ( int x = 0; x <= 1; x++) {
+        for ( int y = 0; y <= 1; y++) {
+	      DFEVector<DFEVar> offsetVec = stream.offset(input, x * width * pFactor/nFactor + y * pFactor/nFactor);
+		  max = offsetVec[i] > max ? offsetVec[i] : max;
+		}
+	  }
+	  activation[i] <== elu(max);
+    }
 
-      DFEVar outEnable = KernelMath.modulo(ht,2).eq(0) & KernelMath.modulo(wt,2).eq(0) & ~(ht.eq(height-1)) & ~(wt.eq(width-1));
-      io.output(OUT_NAME, inVec, outEnable).connect(activation);
+    DFEVar outEnable = KernelMath.modulo(ht,2).eq(0) & KernelMath.modulo(wt,2).eq(0) & ~(ht.eq(height-1)) & ~(wt.eq(width-1));
+    io.output(OUT_NAME, inVec, outEnable).connect(activation);
   }
 	
   public DFEVar elu(DFEVar input) {
-      DFEVar Result = input > 0 ? input : KernelMath.exp(input, fixedPtType) - 1;
-      return Result;
+    DFEVar Result = input > 0 ? input : KernelMath.exp(input, fixedPtType) - 1;
+    return Result;
   }
 }
