@@ -19,40 +19,38 @@ import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
 
 public class DotProductKernel extends KernelComponent {
 
-	private final DFEVector<DFEVar> vec1;
-	private final DFEVector<DFEVar> vec2;
-	private final DFEVar out;
+  private final DFEVector<DFEVar> vec1;
+  private final DFEVector<DFEVar> vec2;
+  private final DFEVar out;
 
-	public DotProductKernel(KernelBase<?> caller, int vecSize, DFEType type) {
-		super(caller);
+  public DotProductKernel(KernelBase<?> caller, int vecSize, DFEType type) {
+    super(caller);
 
-		DFEVectorType<DFEVar> vecT = new DFEVectorType<DFEVar>(type, vecSize);
+    DFEVectorType<DFEVar> vecT = new DFEVectorType<DFEVar>(type, vecSize);
 
-		vec1 = vecT.newInstance(caller);
-		vec2 = vecT.newInstance(caller);
-		
-		// An array of multipliers will be initialized here.
-		DFEVector<DFEVar> vecC = vec1 * vec2;
-		
-	    // Output is the result the recursive sum of all elements
-	    out = sumVec(vecC.getElementsAsList());
-	 }
-	 
-	 public static DFEVar sumVec(List<DFEVar> vec) {
-		 if (vec.size() == 1)
-			 return vec[0];
-		 else
-			 return vec[0] + sumVec(vec.subList(1,vec.size()));	
-	 }
-	 
-	 public void setInputs(DFEVector<DFEVar> vecA, DFEVector<DFEVar> vecB) {
-	    this.vec1.connect(vecA);
-	    this.vec2.connect(vecB);
-	  }
-
-	 public DFEVar getOutput() { return out; }
-
-	 public DFEType getOutputT() { return out.getType(); }
+    vec1 = vecT.newInstance(caller);
+    vec2 = vecT.newInstance(caller);
+    
+    // An array of multipliers will be initialized here.
+    DFEVector<DFEVar> vecC = vec1 * vec2;
+    
+    // Output is the result the recursive sum of all elements
+    out = sumVec(vecC.getElementsAsList());
+  }
+   
+  public static DFEVar sumVec(List<DFEVar> vec) {
+    if (vec.size() == 1)
+      return vec[0];
+    else
+      return vec[0] + sumVec(vec.subList(1,vec.size()));	
+  }
   
-}
+  public void setInputs(DFEVector<DFEVar> vecA, DFEVector<DFEVar> vecB) {
+    this.vec1.connect(vecA);
+    this.vec2.connect(vecB);
+  }
 
+  public DFEVar getOutput() { return out; }
+
+  public DFEType getOutputT() { return out.getType(); }
+}
