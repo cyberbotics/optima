@@ -52,7 +52,7 @@ Note that the source codes are optimized for the Jumax machine, in particular co
 ## Autonomous car simulation
 The `CNN-autonomous-car` directory contains the Webots project of the self-driving car using a convolutional neural network. Its description can be found [here](https://github.com/cyberbotics/optima/wiki/Autonomous-Car-Simulation).
 
-The scripts to compute the trajectory planning and the training of the CNN are located in `CNN-autonomous-car/scripts`.
+The scripts to compute the trajectory planning and the training of the CNN are located in `CNN-autonomous-car/scripts`. The trained model parameters are contained in `offsetModel.pt`.
 
 The training and testing worlds are both located in `CNN-autonomous-car/worlds`.
 
