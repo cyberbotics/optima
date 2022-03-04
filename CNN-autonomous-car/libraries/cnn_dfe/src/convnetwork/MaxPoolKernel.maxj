@@ -20,7 +20,6 @@ public class MaxPoolKernel extends Kernel {
 	
 	public static final String IN_NAME = "input";
 	public static final String OUT_NAME = "output";
-	public static final String CPU_NAME = "cpu";
 	public static final String WIDTH_NAME = "width";
 	public static final String HEIGHT_NAME = "height";
 	
