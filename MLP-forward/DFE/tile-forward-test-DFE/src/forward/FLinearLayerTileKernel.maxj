@@ -23,87 +23,87 @@ import com.maxeler.maxcompiler.v2.utils.MathUtils;
 
 public class FLinearLayerTileKernel extends Kernel {
 
-    public static final String IN_NAME = "input";
-    public static final String W_NAME = "weights";
-    public static final String B_NAME = "biases";
-    public static final String S_NAME = "s";
-    public static final String X_NAME = "x";
-    public static final String INNBVEC_NAME = "innbvec";
-    public static final String OUTNBBLOCK_NAME = "outnbblock";
-    public static final String OFFSET = "offset";
+  public static final String IN_NAME = "input";
+  public static final String W_NAME = "weights";
+  public static final String B_NAME = "biases";
+  public static final String S_NAME = "s";
+  public static final String X_NAME = "x";
+  public static final String INNBVEC_NAME = "innbvec";
+  public static final String OUTNBBLOCK_NAME = "outnbblock";
+  public static final String OFFSET = "offset";
 
-    private final DFEVectorType<DFEVar>  parallelVec;
+  private final DFEVectorType<DFEVar>  parallelVec;
 
-    public FLinearLayerTileKernel(KernelParameters p, int inVecSize, int nbWeightVec, int nbBiases, int nbInVec, int nbOutBlock, int tileOffset) {
-        super(p);
+  public FLinearLayerTileKernel(KernelParameters p, int inVecSize, int nbWeightVec, int nbBiases, int nbInVec, int nbOutBlock, int tileOffset) {
+    super(p);
 
-        this.parallelVec = new DFEVectorType<DFEVar>(dfeFloat(8,24), inVecSize);
+    this.parallelVec = new DFEVectorType<DFEVar>(dfeFloat(8,24), inVecSize);
 
-        DFEVar nbVecI = io.scalarInput(INNBVEC_NAME, dfeUInt(MathUtils.bitsToAddress(nbInVec+1))); 
-        DFEVar nbBlockO = io.scalarInput(OUTNBBLOCK_NAME, dfeUInt(MathUtils.bitsToAddress(nbOutBlock+1))); 
+    DFEVar nbVecI = io.scalarInput(INNBVEC_NAME, dfeUInt(MathUtils.bitsToAddress(nbInVec+1))); 
+    DFEVar nbBlockO = io.scalarInput(OUTNBBLOCK_NAME, dfeUInt(MathUtils.bitsToAddress(nbOutBlock+1))); 
 
-        Params wCounterParams = control.count.makeParams (MathUtils.bitsToAddress(nbWeightVec) + 1).withMax(nbWeightVec).withWrapMode(WrapMode.STOP_AT_MAX);
-        Counter wCounter = control.count.makeCounter(wCounterParams);
-        DFEVar readingW = wCounter.getCount() < nbWeightVec ? constant.var(true) : constant.var(false);
-        DFEVar readingB = wCounter.getCount() < nbBiases ? constant.var(true) : constant.var(false);
+    Params wCounterParams = control.count.makeParams (MathUtils.bitsToAddress(nbWeightVec) + 1).withMax(nbWeightVec).withWrapMode(WrapMode.STOP_AT_MAX);
+    Counter wCounter = control.count.makeCounter(wCounterParams);
+    DFEVar readingW = wCounter.getCount() < nbWeightVec ? constant.var(true) : constant.var(false);
+    DFEVar readingB = wCounter.getCount() < nbBiases ? constant.var(true) : constant.var(false);
 
-        CounterChain chain = control.count.makeCounterChain(~readingW);
-        DFEVar h = chain.addCounter(nbBlockO, 1);
-        DFEVar w = chain.addCounter(nbVecI, 1);
-        DFEVar l = chain.addCounter(tileOffset, 1);
+    CounterChain chain = control.count.makeCounterChain(~readingW);
+    DFEVar h = chain.addCounter(nbBlockO, 1);
+    DFEVar w = chain.addCounter(nbVecI, 1);
+    DFEVar l = chain.addCounter(tileOffset, 1);
 
-        DFEVector<DFEVar> input = io.input(IN_NAME, parallelVec, ~readingW & h.eq(0) & l.eq(0));
-        DFEVector<DFEVar> weights = io.input(W_NAME, parallelVec, readingW);
-        DFEVar biases = io.input(B_NAME, dfeFloat(8,24), readingB);
+    DFEVector<DFEVar> input = io.input(IN_NAME, parallelVec, ~readingW & h.eq(0) & l.eq(0));
+    DFEVector<DFEVar> weights = io.input(W_NAME, parallelVec, readingW);
+    DFEVar biases = io.input(B_NAME, dfeFloat(8,24), readingB);
 
-        // Write weights and biases to the memory
-        Memory<DFEVector<DFEVar>> wMem = mem.alloc(parallelVec, nbWeightVec);
-        Memory<DFEVar> bMem = mem.alloc(dfeFloat(8,24), nbBiases);
-        wMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))), weights, readingW);
-        bMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))), biases, readingB);
+    // Write weights and biases to the memory
+    Memory<DFEVector<DFEVar>> wMem = mem.alloc(parallelVec, nbWeightVec);
+    Memory<DFEVar> bMem = mem.alloc(dfeFloat(8,24), nbBiases);
+    wMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))), weights, readingW);
+    bMem.write(wCounter.getCount().cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))), biases, readingB);
 
-        // Write each input vector to the memory (multiple dot product with diff weights)
-        Memory<DFEVector<DFEVar>> ibuf = mem.alloc(parallelVec, nbInVec+1);
-        DFEVector<DFEVar> inPort = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);
+    // Write each input vector to the memory (multiple dot product with diff weights)
+    Memory<DFEVector<DFEVar>> ibuf = mem.alloc(parallelVec, nbInVec+1);
+    DFEVector<DFEVar> inPort = ibuf.port(w, input, h.eq(0), RamWriteMode.WRITE_FIRST);
 
-        DFEVar wcount = h.cast(dfeUInt(32)) * nbVecI.cast(dfeUInt(32)) * tileOffset + w.cast(dfeUInt(32)) * tileOffset + l.cast(dfeUInt(32));
+    DFEVar wcount = h.cast(dfeUInt(32)) * nbVecI.cast(dfeUInt(32)) * tileOffset + w.cast(dfeUInt(32)) * tileOffset + l.cast(dfeUInt(32));
 
-        // Read correct weight chunk in memory
-        DFEVector<DFEVar> coeff = wMem.read(wcount.cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))));
+    // Read correct weight chunk in memory
+    DFEVector<DFEVar> coeff = wMem.read(wcount.cast(dfeUInt(MathUtils.bitsToAddress(nbWeightVec))));
 
-        // Perform dot product between input and weights vector
-        DotProductKernel dp = new DotProductKernel(getKernel(), inVecSize, dfeFloat(8,24));
-        dp.setInputs(inPort, coeff);
-        DFEVar tmp = dp.getOutput();
+    // Perform dot product between input and weights vector
+    DotProductKernel dp = new DotProductKernel(getKernel(), inVecSize, dfeFloat(8,24));
+    dp.setInputs(inPort, coeff);
+    DFEVar tmp = dp.getOutput();
 
-        // Add all corresponding dot products together
-        DFEVar carriedSum = dfeFloat(8,24).newInstance(this);
-        DFEVar sum = (w.eq(0)) ? constant.var(0).cast(dfeFloat(8,24)) : carriedSum;
-        DFEVar newSum = sum + tmp;	
-        carriedSum.connect(stream.offset(newSum, -tileOffset));
+    // Add all corresponding dot products together
+    DFEVar carriedSum = dfeFloat(8,24).newInstance(this);
+    DFEVar sum = (w.eq(0)) ? constant.var(0).cast(dfeFloat(8,24)) : carriedSum;
+    DFEVar newSum = sum + tmp;	
+    carriedSum.connect(stream.offset(newSum, -tileOffset));
 
-        // Add corresponding bias and apply activation function
-        DFEVar biasAddress = h.cast(dfeUInt(32))*tileOffset + l.cast(dfeUInt(32));
-        DFEVar bias = bMem.read(biasAddress.cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))));
-        DFEVar s = newSum + bias;
-        DFEVar x = tanh(s);
+    // Add corresponding bias and apply activation function
+    DFEVar biasAddress = h.cast(dfeUInt(32))*tileOffset + l.cast(dfeUInt(32));
+    DFEVar bias = bMem.read(biasAddress.cast(dfeUInt(MathUtils.bitsToAddress(nbBiases))));
+    DFEVar s = newSum + bias;
+    DFEVar x = tanh(s);
 
-        // Only enable output when all operations have been done for 1 input vector
-        DFEVar outEnable = w.eq(nbVecI - 1);	
+    // Only enable output when all operations have been done for 1 input vector
+    DFEVar outEnable = w.eq(nbVecI - 1);	
 
-        io.output(S_NAME, s, dfeFloat(8,24), outEnable);
-        io.output(X_NAME, x, dfeFloat(8,24), outEnable);
-    }
-  
-    public DFEVar tanh(DFEVar input) {
-        DFEVar x = input;
-        // Exp
-        DFEVar Exp2xPlus1 = KernelMath.exp(2*x, dfeFloat(8,24)) + 1.0;
-        // Div
-        DFEVar DivResult = 2.0 / Exp2xPlus1;
-        // Sub
-        DFEVar Result = 1.0 - DivResult.cast(dfeFloat(8,24));
-        return Result;
-    }
+    io.output(S_NAME, s, dfeFloat(8,24), outEnable);
+    io.output(X_NAME, x, dfeFloat(8,24), outEnable);
+  }
+
+  public DFEVar tanh(DFEVar input) {
+    DFEVar x = input;
+    // Exp
+    DFEVar Exp2xPlus1 = KernelMath.exp(2*x, dfeFloat(8,24)) + 1.0;
+    // Div
+    DFEVar DivResult = 2.0 / Exp2xPlus1;
+    // Sub
+    DFEVar Result = 1.0 - DivResult.cast(dfeFloat(8,24));
+    return Result;
+  }
 }
 

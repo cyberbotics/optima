@@ -12,7 +12,6 @@ import com.maxeler.maxcompiler.v2.build.EngineParameters;
 import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
 import com.maxeler.maxcompiler.v2.managers.custom.stdlib.LMemCommandGroup;
 import com.maxeler.maxcompiler.v2.managers.custom.stdlib.LMemInterface;
-//import com.maxeler.platform.max5.manager.Max5LimaManager.LMemGlobalConfig;
 import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
 import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
 import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface.Direction;
@@ -24,262 +23,262 @@ import com.maxeler.platform.max5.manager.BuildConfig.Effort;
 
 public class ConvNetworkMAX5CManager extends MAX5CManager {
 
-	private static final String CONV_KERNEL1 = "CONVOLUTION_LAYER1";
-	private static final String CONV_KERNEL2 = "CONVOLUTION_LAYER2";
-	private static final String CONV_KERNEL3 = "CONVOLUTION_LAYER3";
-	private static final String MAXPOOL_KERNEL1 = "MAXPOOL_LAYER1";
-	private static final String MAXPOOL_KERNEL2 = "MAXPOOL_LAYER2";
-	private static final String MAXPOOL_KERNEL3 = "MAXPOOL_LAYER3";
-	private static final String TRANSPOSE_KERNEL1 = "TRANSPOSE_LAYER1";
-	private static final String TRANSPOSE_KERNEL2 = "TRANSPOSE_LAYER2";
-	private static final String TRANSPOSE_KERNEL3 = "TRANSPOSE_LAYER3";
-	private static final String LINEAR_KERNEL1 = "LINEAR_LAYER1";
-	private static final String LINEAR_KERNEL2 = "LINEAR_LAYER2";
-	
-	private static final CPUTypes FIXEDPT_TYPE = CPUTypes.INT32;
-	
-	private static final int WINDOW = 9;
-	private static final int K_SIZE = 3;
-	
-	private static final int P_CONV1 = 16;
-	private static final int OC_CONV1 = 16;
-	private static final int OU_CONV1 = OC_CONV1 / P_CONV1;
-	private static final int IC_CONV1 = 3;
-	private static final int HT_CONV1 = 80;
-	private static final int WT_CONV1 = 320;
-	
-	private static final int P_POOL1 = 4;
-	private static final int HT_POOL1 = HT_CONV1 - K_SIZE + 1;
-	private static final int WT_POOL1 = WT_CONV1 - K_SIZE + 1;
-	
-	private static final int P_CONV2 = 16;
-	private static final int OC_CONV2 = 32;
-	private static final int OU_CONV2 = OC_CONV2 / P_CONV2;
-	private static final int IC_CONV2 = OC_CONV1;
-	private static final int HT_CONV2 = (int)Math.floor(HT_POOL1 / 2);
-	private static final int WT_CONV2 = (int)Math.floor(WT_POOL1 / 2);
-	
-	private static final int P_POOL2 = 4;
-	private static final int HT_POOL2 = HT_CONV2 - K_SIZE + 1;
-	private static final int WT_POOL2 = WT_CONV2 - K_SIZE + 1;
-	
-	private static final int P_CONV3 = 16;
-	private static final int OC_CONV3 = 64;
-	private static final int OU_CONV3 = OC_CONV3 / P_CONV3;
-	private static final int IC_CONV3 = OC_CONV2;
-	private static final int HT_CONV3 = (int)Math.floor(HT_POOL2 / 2);
-	private static final int WT_CONV3 = (int)Math.floor(WT_POOL2 / 2);
-	
-	private static final int P_POOL3 = 4;
-	private static final int HT_POOL3 = HT_CONV3 - K_SIZE + 1;
-	private static final int WT_POOL3 = WT_CONV3 - K_SIZE + 1;
-	
-	private static final int HT_CONV4 = (int)Math.floor(HT_POOL3 / 2);
-	private static final int WT_CONV4 = (int)Math.floor(WT_POOL3 / 2);
-	
-	private static final int VS_LINEAR1 = 64;
-	private static final int IS_LINEAR1 = HT_CONV4 * WT_CONV4 * OC_CONV3 / VS_LINEAR1;
-	private static final int OS_LINEAR1 = 500;
-	private static final int PAD_LINEAR1 = 256; // must be a multiple of VS_LINEAR and LMEM burst size (192 bytes)
-	
-	private static final int VS_LINEAR2 = 1;
-	private static final int IS_LINEAR2 = OS_LINEAR1 / VS_LINEAR2;
-	private static final int OS_LINEAR2 = 2;
-	private static final int PAD_LINEAR2 = 8; // must be a multiple of VS_LINEAR and LMEM burst size (192 bytes)
-	
-	private static final int OUT_PAD = 2;
-	
-	ConvNetworkMAX5CManager(EngineParameters engineParameters) {
-		super(engineParameters);
-		
-		LMemGlobalConfig lmemConfig = getLMemGlobalConfig();
-		lmemConfig.setMcpFrequency(240);
-		setAllowNonMultipleTransitions(true);
-		setDefaultStreamClockFrequency(230);
-		
-		
-		KernelBlock convKernel1 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL1), WT_CONV1, HT_CONV1, IC_CONV1, OU_CONV1, WINDOW, P_CONV1));
-		KernelBlock maxPoolKernel1 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL1), WT_POOL1, HT_POOL1, P_CONV1, P_POOL1, true));
-		KernelBlock transposeKernel1 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL1), WT_CONV2 * HT_CONV2, P_CONV1));
-		assignToNamedRegion(convKernel1, getSlrOfDimm('a'));
-		assignToNamedRegion(maxPoolKernel1, getSlrOfDimm('a'));
-		assignToNamedRegion(transposeKernel1, getSlrOfDimm('a'));
+  private static final String CONV_KERNEL1 = "CONVOLUTION_LAYER1";
+  private static final String CONV_KERNEL2 = "CONVOLUTION_LAYER2";
+  private static final String CONV_KERNEL3 = "CONVOLUTION_LAYER3";
+  private static final String MAXPOOL_KERNEL1 = "MAXPOOL_LAYER1";
+  private static final String MAXPOOL_KERNEL2 = "MAXPOOL_LAYER2";
+  private static final String MAXPOOL_KERNEL3 = "MAXPOOL_LAYER3";
+  private static final String TRANSPOSE_KERNEL1 = "TRANSPOSE_LAYER1";
+  private static final String TRANSPOSE_KERNEL2 = "TRANSPOSE_LAYER2";
+  private static final String TRANSPOSE_KERNEL3 = "TRANSPOSE_LAYER3";
+  private static final String LINEAR_KERNEL1 = "LINEAR_LAYER1";
+  private static final String LINEAR_KERNEL2 = "LINEAR_LAYER2";
 
-		KernelBlock convKernel2 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL2), WT_CONV2, HT_CONV2, IC_CONV2, OU_CONV2, WINDOW, P_CONV2));
-		KernelBlock maxPoolKernel2 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL2), WT_POOL2, HT_POOL2, P_CONV2, P_POOL2, false));
-		KernelBlock transposeKernel2 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL2), WT_CONV3 * HT_CONV3, P_CONV2));
-		assignToNamedRegion(convKernel2, getSlrOfDimm('b'));
-		assignToNamedRegion(maxPoolKernel2, getSlrOfDimm('b'));
-		assignToNamedRegion(transposeKernel2, getSlrOfDimm('b'));
-		
-		KernelBlock convKernel3 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL3), WT_CONV3, HT_CONV3, IC_CONV3, OU_CONV3, WINDOW, P_CONV3));
-		KernelBlock maxPoolKernel3 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL3), WT_POOL3, HT_POOL3, P_CONV3, P_POOL3, false));
-		KernelBlock transposeKernel3 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL3), WT_CONV4 * HT_CONV4, P_CONV3));
-		KernelBlock linearKernel1 = addKernel(new LinearLayerKernel(makeKernelParameters(LINEAR_KERNEL1), VS_LINEAR1, IS_LINEAR1, OS_LINEAR1, false, OUT_PAD));
-		KernelBlock linearKernel2 = addKernel(new LinearLayerKernel(makeKernelParameters(LINEAR_KERNEL2), VS_LINEAR2, IS_LINEAR2, OS_LINEAR2, true, OUT_PAD));
-		assignToNamedRegion(convKernel3, getSlrOfDimm('c'));
-		assignToNamedRegion(maxPoolKernel3, getSlrOfDimm('c'));
-		assignToNamedRegion(transposeKernel3, getSlrOfDimm('c'));
-		assignToNamedRegion(linearKernel1, getSlrOfDimm('c'));
-		assignToNamedRegion(linearKernel2, getSlrOfDimm('c'));
+  private static final CPUTypes FIXEDPT_TYPE = CPUTypes.INT32;
 
-		LMemInterface iface = addLMemInterface();
-		iface.addStreamToLMem("cpu2lmem", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D) <== addStreamFromCPU("fromcpu");
-		
-		convKernel1.getInput(ConvolutionKernel.IN_NAME) <== addStreamFromCPU("inputfromcpu");
-		convKernel1.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights1", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
-		maxPoolKernel1.getInput(MaxPoolKernel.IN_NAME) <== convKernel1.getOutput(ConvolutionKernel.OUT_NAME);
-		transposeKernel1.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel1.getOutput(MaxPoolKernel.OUT_NAME);
-		
-		convKernel2.getInput(ConvolutionKernel.IN_NAME) <== transposeKernel1.getOutput(TransposeKernel.OUT_NAME);
-		convKernel2.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights2", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
-		maxPoolKernel2.getInput(MaxPoolKernel.IN_NAME) <== convKernel2.getOutput(ConvolutionKernel.OUT_NAME);
-		transposeKernel2.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel2.getOutput(MaxPoolKernel.OUT_NAME);
-		
-		convKernel3.getInput(ConvolutionKernel.IN_NAME) <== transposeKernel2.getOutput(TransposeKernel.OUT_NAME);
-		convKernel3.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights3", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
-		maxPoolKernel3.getInput(MaxPoolKernel.IN_NAME) <== convKernel3.getOutput(ConvolutionKernel.OUT_NAME);
-		transposeKernel3.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel3.getOutput(MaxPoolKernel.OUT_NAME);
-		
-		linearKernel1.getInput(LinearLayerKernel.IN_NAME) <== transposeKernel3.getOutput(TransposeKernel.OUT_NAME);
-		linearKernel1.getInput(LinearLayerKernel.W_NAME) <== iface.addStreamFromLMem("weights4", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
-		linearKernel2.getInput(LinearLayerKernel.IN_NAME) <== linearKernel1.getOutput(LinearLayerKernel.OUT_NAME);
-		linearKernel2.getInput(LinearLayerKernel.W_NAME) <== iface.addStreamFromLMem("weights5", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
-		
-		addStreamToCPU("outputtocpu") <== linearKernel2.getOutput(LinearLayerKernel.OUT_NAME);
-		
-		exportConstants();
-	}
-	
-	private void exportConstants() {
-		addMaxFileConstant("WINDOW", WINDOW);
-		addMaxFileConstant("K_SIZE", K_SIZE);
-		addMaxFileConstant("OC_CONV1", OC_CONV1);
-		addMaxFileConstant("IC_CONV1", IC_CONV1);
-		addMaxFileConstant("HT_CONV1", HT_CONV1);
-		addMaxFileConstant("WT_CONV1", WT_CONV1);
-		
-		addMaxFileConstant("HT_POOL1", HT_POOL1);
-		addMaxFileConstant("WT_POOL1", WT_POOL1);
-		
-		addMaxFileConstant("OC_CONV2", OC_CONV2);
-		addMaxFileConstant("IC_CONV2", IC_CONV2);
-		addMaxFileConstant("HT_CONV2", HT_CONV2);
-		addMaxFileConstant("WT_CONV2", WT_CONV2);
-		
-		addMaxFileConstant("HT_POOL2", HT_POOL2);
-		addMaxFileConstant("WT_POOL2", WT_POOL2);
-		
-		addMaxFileConstant("OC_CONV3", OC_CONV3);
-		addMaxFileConstant("IC_CONV3", IC_CONV3);
-		addMaxFileConstant("HT_CONV3", HT_CONV3);
-		addMaxFileConstant("WT_CONV3", WT_CONV3);
-		
-		addMaxFileConstant("HT_POOL3", HT_POOL3);
-		addMaxFileConstant("WT_POOL3", WT_POOL3);
-		
-		addMaxFileConstant("HT_CONV4", HT_CONV4);
-		addMaxFileConstant("WT_CONV4", WT_CONV4);
-		
-		addMaxFileConstant("VS_LINEAR1", VS_LINEAR1);
-		addMaxFileConstant("IS_LINEAR1", IS_LINEAR1);
-		addMaxFileConstant("OS_LINEAR1", OS_LINEAR1);
-		addMaxFileConstant("PAD_LINEAR1", PAD_LINEAR1);
-		
-		addMaxFileConstant("VS_LINEAR2", VS_LINEAR2);
-		addMaxFileConstant("IS_LINEAR2", IS_LINEAR2);
-		addMaxFileConstant("OS_LINEAR2", OS_LINEAR2);
-		addMaxFileConstant("PAD_LINEAR2", PAD_LINEAR2);
-		
-		addMaxFileConstant("OUT_PAD", OUT_PAD);
-	}
+  private static final int WINDOW = 9;
+  private static final int K_SIZE = 3;
 
-	private static EngineInterface interfaceWrite(String name) {
-		EngineInterface ei = new EngineInterface(name);
+  private static final int P_CONV1 = 16;
+  private static final int OC_CONV1 = 16;
+  private static final int OU_CONV1 = OC_CONV1 / P_CONV1;
+  private static final int IC_CONV1 = 3;
+  private static final int HT_CONV1 = 80;
+  private static final int WT_CONV1 = 320;
 
-		InterfaceParam size  = ei.addParam("size", FIXEDPT_TYPE);
-		InterfaceParam start = ei.addParam("start", FIXEDPT_TYPE);
-		InterfaceParam sizeInBytes = size * FIXEDPT_TYPE.sizeInBytes();
-		
-		ei.setStream("fromcpu", FIXEDPT_TYPE, sizeInBytes);
-		ei.setLMemLinear("cpu2lmem", start * FIXEDPT_TYPE.sizeInBytes(), sizeInBytes);
-		
-		ei.ignoreAll(Direction.IN_OUT);
-		
-		return ei;
-	}
+  private static final int P_POOL1 = 4;
+  private static final int HT_POOL1 = HT_CONV1 - K_SIZE + 1;
+  private static final int WT_POOL1 = WT_CONV1 - K_SIZE + 1;
 
-	private static EngineInterface interfaceDefault() {
-		EngineInterface ei = new EngineInterface();
-		
-		InterfaceParam zero = ei.addConstant(0l);
-		InterfaceParam size1 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV1 * IC_CONV1 * K_SIZE * K_SIZE);
-		InterfaceParam size2 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV2 * IC_CONV2 * K_SIZE * K_SIZE);
-		InterfaceParam size3 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV3 * IC_CONV3 * K_SIZE * K_SIZE);
-		InterfaceParam size4 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * (VS_LINEAR1 * IS_LINEAR1 * OS_LINEAR1 + PAD_LINEAR1));
-		InterfaceParam size5 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * (VS_LINEAR2 * IS_LINEAR2 * OS_LINEAR2 + PAD_LINEAR2));
-		ei.setLMemLinear("weights1", zero, size1);
-		ei.setLMemLinear("weights2", size1, size2);
-		ei.setLMemLinear("weights3", size1 + size2, size3);
-		ei.setLMemLinear("weights4", size1 + size2 + size3, size4);
-		ei.setLMemLinear("weights5", size1 + size2 + size3 + size4, size5);
-		
-		ei.setTicks(CONV_KERNEL1, OU_CONV1 * IC_CONV1 * HT_CONV1 * WT_CONV1);
-		ei.setTicks(MAXPOOL_KERNEL1, OC_CONV1 * HT_POOL1 * WT_POOL1 / P_POOL1);
-		ei.setTicks(TRANSPOSE_KERNEL1, 2 * OC_CONV1 * HT_CONV2 * WT_CONV2);
-		
-		ei.setTicks(CONV_KERNEL2, IC_CONV2 * OU_CONV2 * HT_CONV2 * WT_CONV2);
-		ei.setTicks(MAXPOOL_KERNEL2, OC_CONV2 * HT_POOL2 * WT_POOL2 / P_POOL2);
-		ei.setTicks(TRANSPOSE_KERNEL2, 2*OC_CONV2 * HT_CONV3 * WT_CONV3);
+  private static final int P_CONV2 = 16;
+  private static final int OC_CONV2 = 32;
+  private static final int OU_CONV2 = OC_CONV2 / P_CONV2;
+  private static final int IC_CONV2 = OC_CONV1;
+  private static final int HT_CONV2 = (int)Math.floor(HT_POOL1 / 2);
+  private static final int WT_CONV2 = (int)Math.floor(WT_POOL1 / 2);
 
-		ei.setTicks(CONV_KERNEL3, OU_CONV3 * IC_CONV3 * HT_CONV3 * WT_CONV3);
-		ei.setTicks(MAXPOOL_KERNEL3, OC_CONV3 * HT_POOL3 * WT_POOL3 / P_POOL3);
-		ei.setTicks(TRANSPOSE_KERNEL3, 2 * OC_CONV3 * HT_CONV4 * WT_CONV4);
+  private static final int P_POOL2 = 4;
+  private static final int HT_POOL2 = HT_CONV2 - K_SIZE + 1;
+  private static final int WT_POOL2 = WT_CONV2 - K_SIZE + 1;
 
-		ei.setTicks(LINEAR_KERNEL1, IS_LINEAR1 * OS_LINEAR1 + PAD_LINEAR1 / VS_LINEAR1);
-		ei.setTicks(LINEAR_KERNEL2, IS_LINEAR2 * OS_LINEAR2 + PAD_LINEAR2 / VS_LINEAR2);
-		
-		ei.setStream("inputfromcpu", FIXEDPT_TYPE,  IC_CONV1 * HT_CONV1 * WT_CONV1 * FIXEDPT_TYPE.sizeInBytes());
-		ei.setStream("outputtocpu", FIXEDPT_TYPE,  (OS_LINEAR2 + OUT_PAD) * FIXEDPT_TYPE.sizeInBytes());
-		
-		ei.setScalar(CONV_KERNEL1, ConvolutionKernel.OCHANNEL_NAME, OU_CONV1);
-		ei.setScalar(CONV_KERNEL1, ConvolutionKernel.ICHANNEL_NAME, IC_CONV1);
-		ei.setScalar(CONV_KERNEL1, ConvolutionKernel.HEIGHT_NAME, HT_CONV1);
-		ei.setScalar(CONV_KERNEL1, ConvolutionKernel.WIDTH_NAME, WT_CONV1);
-		
-		ei.setScalar(CONV_KERNEL2, ConvolutionKernel.OCHANNEL_NAME, OU_CONV2);
-		ei.setScalar(CONV_KERNEL2, ConvolutionKernel.ICHANNEL_NAME, IC_CONV2);
-		ei.setScalar(CONV_KERNEL2, ConvolutionKernel.HEIGHT_NAME, HT_CONV2);
-		ei.setScalar(CONV_KERNEL2, ConvolutionKernel.WIDTH_NAME, WT_CONV2);
-		
-		ei.setScalar(CONV_KERNEL3, ConvolutionKernel.OCHANNEL_NAME, OU_CONV3);
-		ei.setScalar(CONV_KERNEL3, ConvolutionKernel.ICHANNEL_NAME, IC_CONV3);
-		ei.setScalar(CONV_KERNEL3, ConvolutionKernel.HEIGHT_NAME, HT_CONV3);
-		ei.setScalar(CONV_KERNEL3, ConvolutionKernel.WIDTH_NAME, WT_CONV3);
-		
-		ei.setScalar(LINEAR_KERNEL1, LinearLayerKernel.INNBELEM_NAME, IS_LINEAR1);
-		ei.setScalar(LINEAR_KERNEL1, LinearLayerKernel.OUTNBELEM_NAME, OS_LINEAR1);
-		
-		ei.setScalar(LINEAR_KERNEL2, LinearLayerKernel.INNBELEM_NAME, IS_LINEAR2);
-		ei.setScalar(LINEAR_KERNEL2, LinearLayerKernel.OUTNBELEM_NAME, OS_LINEAR2);
-		
-		ei.ignoreLMem("cpu2lmem");
-		ei.ignoreStream("fromcpu");
-		
-		return ei;
-	}
+  private static final int P_CONV3 = 16;
+  private static final int OC_CONV3 = 64;
+  private static final int OU_CONV3 = OC_CONV3 / P_CONV3;
+  private static final int IC_CONV3 = OC_CONV2;
+  private static final int HT_CONV3 = (int)Math.floor(HT_POOL2 / 2);
+  private static final int WT_CONV3 = (int)Math.floor(WT_POOL2 / 2);
 
-	public static void main(String[] args) {
-		ConvNetworkMAX5CManager m = new ConvNetworkMAX5CManager(new EngineParameters(args));
+  private static final int P_POOL3 = 4;
+  private static final int HT_POOL3 = HT_CONV3 - K_SIZE + 1;
+  private static final int WT_POOL3 = WT_CONV3 - K_SIZE + 1;
 
-		m.createSlicInterface(interfaceWrite("writeLMem"));
-		m.createSlicInterface(interfaceDefault());
-		
-		BuildConfig buildConfig = m.getBuildConfig();
-		buildConfig.setBuildEffort(Effort.VERY_HIGH);
-		buildConfig.setParallelism(4);
-		buildConfig.setImplementationStrategies(ImplementationStrategy.MAXELER1, ImplementationStrategy.MAXELER2, ImplementationStrategy.MAXELER3, ImplementationStrategy.MAXELER4);
+  private static final int HT_CONV4 = (int)Math.floor(HT_POOL3 / 2);
+  private static final int WT_CONV4 = (int)Math.floor(WT_POOL3 / 2);
 
-		m.build();
-	}
+  private static final int VS_LINEAR1 = 64;
+  private static final int IS_LINEAR1 = HT_CONV4 * WT_CONV4 * OC_CONV3 / VS_LINEAR1;
+  private static final int OS_LINEAR1 = 500;
+  private static final int PAD_LINEAR1 = 256; // must be a multiple of VS_LINEAR and LMEM burst size (192 bytes)
+
+  private static final int VS_LINEAR2 = 1;
+  private static final int IS_LINEAR2 = OS_LINEAR1 / VS_LINEAR2;
+  private static final int OS_LINEAR2 = 2;
+  private static final int PAD_LINEAR2 = 8; // must be a multiple of VS_LINEAR and LMEM burst size (192 bytes)
+
+  private static final int OUT_PAD = 2;
+  
+  ConvNetworkMAX5CManager(EngineParameters engineParameters) {
+    super(engineParameters);
+
+    LMemGlobalConfig lmemConfig = getLMemGlobalConfig();
+    lmemConfig.setMcpFrequency(240);
+    setAllowNonMultipleTransitions(true);
+    setDefaultStreamClockFrequency(230);
+
+
+    KernelBlock convKernel1 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL1), WT_CONV1, HT_CONV1, IC_CONV1, OU_CONV1, WINDOW, P_CONV1));
+    KernelBlock maxPoolKernel1 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL1), WT_POOL1, HT_POOL1, P_CONV1, P_POOL1, true));
+    KernelBlock transposeKernel1 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL1), WT_CONV2 * HT_CONV2, P_CONV1));
+    assignToNamedRegion(convKernel1, getSlrOfDimm('a'));
+    assignToNamedRegion(maxPoolKernel1, getSlrOfDimm('a'));
+    assignToNamedRegion(transposeKernel1, getSlrOfDimm('a'));
+
+    KernelBlock convKernel2 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL2), WT_CONV2, HT_CONV2, IC_CONV2, OU_CONV2, WINDOW, P_CONV2));
+    KernelBlock maxPoolKernel2 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL2), WT_POOL2, HT_POOL2, P_CONV2, P_POOL2, false));
+    KernelBlock transposeKernel2 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL2), WT_CONV3 * HT_CONV3, P_CONV2));
+    assignToNamedRegion(convKernel2, getSlrOfDimm('b'));
+    assignToNamedRegion(maxPoolKernel2, getSlrOfDimm('b'));
+    assignToNamedRegion(transposeKernel2, getSlrOfDimm('b'));
+
+    KernelBlock convKernel3 = addKernel(new ConvolutionKernel(makeKernelParameters(CONV_KERNEL3), WT_CONV3, HT_CONV3, IC_CONV3, OU_CONV3, WINDOW, P_CONV3));
+    KernelBlock maxPoolKernel3 = addKernel(new MaxPoolKernel(makeKernelParameters(MAXPOOL_KERNEL3), WT_POOL3, HT_POOL3, P_CONV3, P_POOL3, false));
+    KernelBlock transposeKernel3 = addKernel(new TransposeKernel(makeKernelParameters(TRANSPOSE_KERNEL3), WT_CONV4 * HT_CONV4, P_CONV3));
+    KernelBlock linearKernel1 = addKernel(new LinearLayerKernel(makeKernelParameters(LINEAR_KERNEL1), VS_LINEAR1, IS_LINEAR1, OS_LINEAR1, false, OUT_PAD));
+    KernelBlock linearKernel2 = addKernel(new LinearLayerKernel(makeKernelParameters(LINEAR_KERNEL2), VS_LINEAR2, IS_LINEAR2, OS_LINEAR2, true, OUT_PAD));
+    assignToNamedRegion(convKernel3, getSlrOfDimm('c'));
+    assignToNamedRegion(maxPoolKernel3, getSlrOfDimm('c'));
+    assignToNamedRegion(transposeKernel3, getSlrOfDimm('c'));
+    assignToNamedRegion(linearKernel1, getSlrOfDimm('c'));
+    assignToNamedRegion(linearKernel2, getSlrOfDimm('c'));
+
+    LMemInterface iface = addLMemInterface();
+    iface.addStreamToLMem("cpu2lmem", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D) <== addStreamFromCPU("fromcpu");
+
+    convKernel1.getInput(ConvolutionKernel.IN_NAME) <== addStreamFromCPU("inputfromcpu");
+    convKernel1.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights1", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
+    maxPoolKernel1.getInput(MaxPoolKernel.IN_NAME) <== convKernel1.getOutput(ConvolutionKernel.OUT_NAME);
+    transposeKernel1.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel1.getOutput(MaxPoolKernel.OUT_NAME);
+
+    convKernel2.getInput(ConvolutionKernel.IN_NAME) <== transposeKernel1.getOutput(TransposeKernel.OUT_NAME);
+    convKernel2.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights2", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
+    maxPoolKernel2.getInput(MaxPoolKernel.IN_NAME) <== convKernel2.getOutput(ConvolutionKernel.OUT_NAME);
+    transposeKernel2.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel2.getOutput(MaxPoolKernel.OUT_NAME);
+
+    convKernel3.getInput(ConvolutionKernel.IN_NAME) <== transposeKernel2.getOutput(TransposeKernel.OUT_NAME);
+    convKernel3.getInput(ConvolutionKernel.W_NAME) <== iface.addStreamFromLMem("weights3", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
+    maxPoolKernel3.getInput(MaxPoolKernel.IN_NAME) <== convKernel3.getOutput(ConvolutionKernel.OUT_NAME);
+    transposeKernel3.getInput(TransposeKernel.IN_NAME) <== maxPoolKernel3.getOutput(MaxPoolKernel.OUT_NAME);
+
+    linearKernel1.getInput(LinearLayerKernel.IN_NAME) <== transposeKernel3.getOutput(TransposeKernel.OUT_NAME);
+    linearKernel1.getInput(LinearLayerKernel.W_NAME) <== iface.addStreamFromLMem("weights4", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
+    linearKernel2.getInput(LinearLayerKernel.IN_NAME) <== linearKernel1.getOutput(LinearLayerKernel.OUT_NAME);
+    linearKernel2.getInput(LinearLayerKernel.W_NAME) <== iface.addStreamFromLMem("weights5", LMemCommandGroup.MemoryAccessPattern.LINEAR_1D);
+
+    addStreamToCPU("outputtocpu") <== linearKernel2.getOutput(LinearLayerKernel.OUT_NAME);
+
+    exportConstants();
+  }
+  
+  private void exportConstants() {
+    addMaxFileConstant("WINDOW", WINDOW);
+    addMaxFileConstant("K_SIZE", K_SIZE);
+    addMaxFileConstant("OC_CONV1", OC_CONV1);
+    addMaxFileConstant("IC_CONV1", IC_CONV1);
+    addMaxFileConstant("HT_CONV1", HT_CONV1);
+    addMaxFileConstant("WT_CONV1", WT_CONV1);
+
+    addMaxFileConstant("HT_POOL1", HT_POOL1);
+    addMaxFileConstant("WT_POOL1", WT_POOL1);
+
+    addMaxFileConstant("OC_CONV2", OC_CONV2);
+    addMaxFileConstant("IC_CONV2", IC_CONV2);
+    addMaxFileConstant("HT_CONV2", HT_CONV2);
+    addMaxFileConstant("WT_CONV2", WT_CONV2);
+
+    addMaxFileConstant("HT_POOL2", HT_POOL2);
+    addMaxFileConstant("WT_POOL2", WT_POOL2);
+
+    addMaxFileConstant("OC_CONV3", OC_CONV3);
+    addMaxFileConstant("IC_CONV3", IC_CONV3);
+    addMaxFileConstant("HT_CONV3", HT_CONV3);
+    addMaxFileConstant("WT_CONV3", WT_CONV3);
+
+    addMaxFileConstant("HT_POOL3", HT_POOL3);
+    addMaxFileConstant("WT_POOL3", WT_POOL3);
+
+    addMaxFileConstant("HT_CONV4", HT_CONV4);
+    addMaxFileConstant("WT_CONV4", WT_CONV4);
+
+    addMaxFileConstant("VS_LINEAR1", VS_LINEAR1);
+    addMaxFileConstant("IS_LINEAR1", IS_LINEAR1);
+    addMaxFileConstant("OS_LINEAR1", OS_LINEAR1);
+    addMaxFileConstant("PAD_LINEAR1", PAD_LINEAR1);
+
+    addMaxFileConstant("VS_LINEAR2", VS_LINEAR2);
+    addMaxFileConstant("IS_LINEAR2", IS_LINEAR2);
+    addMaxFileConstant("OS_LINEAR2", OS_LINEAR2);
+    addMaxFileConstant("PAD_LINEAR2", PAD_LINEAR2);
+
+    addMaxFileConstant("OUT_PAD", OUT_PAD);
+  }
+
+  private static EngineInterface interfaceWrite(String name) {
+    EngineInterface ei = new EngineInterface(name);
+
+    InterfaceParam size  = ei.addParam("size", FIXEDPT_TYPE);
+    InterfaceParam start = ei.addParam("start", FIXEDPT_TYPE);
+    InterfaceParam sizeInBytes = size * FIXEDPT_TYPE.sizeInBytes();
+
+    ei.setStream("fromcpu", FIXEDPT_TYPE, sizeInBytes);
+    ei.setLMemLinear("cpu2lmem", start * FIXEDPT_TYPE.sizeInBytes(), sizeInBytes);
+
+    ei.ignoreAll(Direction.IN_OUT);
+
+    return ei;
+  }
+
+  private static EngineInterface interfaceDefault() {
+    EngineInterface ei = new EngineInterface();
+
+    InterfaceParam zero = ei.addConstant(0l);
+    InterfaceParam size1 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV1 * IC_CONV1 * K_SIZE * K_SIZE);
+    InterfaceParam size2 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV2 * IC_CONV2 * K_SIZE * K_SIZE);
+    InterfaceParam size3 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * OC_CONV3 * IC_CONV3 * K_SIZE * K_SIZE);
+    InterfaceParam size4 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * (VS_LINEAR1 * IS_LINEAR1 * OS_LINEAR1 + PAD_LINEAR1));
+    InterfaceParam size5 = ei.addConstant(FIXEDPT_TYPE.sizeInBytes() * (VS_LINEAR2 * IS_LINEAR2 * OS_LINEAR2 + PAD_LINEAR2));
+    ei.setLMemLinear("weights1", zero, size1);
+    ei.setLMemLinear("weights2", size1, size2);
+    ei.setLMemLinear("weights3", size1 + size2, size3);
+    ei.setLMemLinear("weights4", size1 + size2 + size3, size4);
+    ei.setLMemLinear("weights5", size1 + size2 + size3 + size4, size5);
+
+    ei.setTicks(CONV_KERNEL1, OU_CONV1 * IC_CONV1 * HT_CONV1 * WT_CONV1);
+    ei.setTicks(MAXPOOL_KERNEL1, OC_CONV1 * HT_POOL1 * WT_POOL1 / P_POOL1);
+    ei.setTicks(TRANSPOSE_KERNEL1, 2 * OC_CONV1 * HT_CONV2 * WT_CONV2);
+
+    ei.setTicks(CONV_KERNEL2, IC_CONV2 * OU_CONV2 * HT_CONV2 * WT_CONV2);
+    ei.setTicks(MAXPOOL_KERNEL2, OC_CONV2 * HT_POOL2 * WT_POOL2 / P_POOL2);
+    ei.setTicks(TRANSPOSE_KERNEL2, 2*OC_CONV2 * HT_CONV3 * WT_CONV3);
+
+    ei.setTicks(CONV_KERNEL3, OU_CONV3 * IC_CONV3 * HT_CONV3 * WT_CONV3);
+    ei.setTicks(MAXPOOL_KERNEL3, OC_CONV3 * HT_POOL3 * WT_POOL3 / P_POOL3);
+    ei.setTicks(TRANSPOSE_KERNEL3, 2 * OC_CONV3 * HT_CONV4 * WT_CONV4);
+
+    ei.setTicks(LINEAR_KERNEL1, IS_LINEAR1 * OS_LINEAR1 + PAD_LINEAR1 / VS_LINEAR1);
+    ei.setTicks(LINEAR_KERNEL2, IS_LINEAR2 * OS_LINEAR2 + PAD_LINEAR2 / VS_LINEAR2);
+
+    ei.setStream("inputfromcpu", FIXEDPT_TYPE,  IC_CONV1 * HT_CONV1 * WT_CONV1 * FIXEDPT_TYPE.sizeInBytes());
+    ei.setStream("outputtocpu", FIXEDPT_TYPE,  (OS_LINEAR2 + OUT_PAD) * FIXEDPT_TYPE.sizeInBytes());
+
+    ei.setScalar(CONV_KERNEL1, ConvolutionKernel.OCHANNEL_NAME, OU_CONV1);
+    ei.setScalar(CONV_KERNEL1, ConvolutionKernel.ICHANNEL_NAME, IC_CONV1);
+    ei.setScalar(CONV_KERNEL1, ConvolutionKernel.HEIGHT_NAME, HT_CONV1);
+    ei.setScalar(CONV_KERNEL1, ConvolutionKernel.WIDTH_NAME, WT_CONV1);
+
+    ei.setScalar(CONV_KERNEL2, ConvolutionKernel.OCHANNEL_NAME, OU_CONV2);
+    ei.setScalar(CONV_KERNEL2, ConvolutionKernel.ICHANNEL_NAME, IC_CONV2);
+    ei.setScalar(CONV_KERNEL2, ConvolutionKernel.HEIGHT_NAME, HT_CONV2);
+    ei.setScalar(CONV_KERNEL2, ConvolutionKernel.WIDTH_NAME, WT_CONV2);
+
+    ei.setScalar(CONV_KERNEL3, ConvolutionKernel.OCHANNEL_NAME, OU_CONV3);
+    ei.setScalar(CONV_KERNEL3, ConvolutionKernel.ICHANNEL_NAME, IC_CONV3);
+    ei.setScalar(CONV_KERNEL3, ConvolutionKernel.HEIGHT_NAME, HT_CONV3);
+    ei.setScalar(CONV_KERNEL3, ConvolutionKernel.WIDTH_NAME, WT_CONV3);
+
+    ei.setScalar(LINEAR_KERNEL1, LinearLayerKernel.INNBELEM_NAME, IS_LINEAR1);
+    ei.setScalar(LINEAR_KERNEL1, LinearLayerKernel.OUTNBELEM_NAME, OS_LINEAR1);
+
+    ei.setScalar(LINEAR_KERNEL2, LinearLayerKernel.INNBELEM_NAME, IS_LINEAR2);
+    ei.setScalar(LINEAR_KERNEL2, LinearLayerKernel.OUTNBELEM_NAME, OS_LINEAR2);
+
+    ei.ignoreLMem("cpu2lmem");
+    ei.ignoreStream("fromcpu");
+
+    return ei;
+  }
+
+  public static void main(String[] args) {
+    ConvNetworkMAX5CManager m = new ConvNetworkMAX5CManager(new EngineParameters(args));
+
+    m.createSlicInterface(interfaceWrite("writeLMem"));
+    m.createSlicInterface(interfaceDefault());
+
+    BuildConfig buildConfig = m.getBuildConfig();
+    buildConfig.setBuildEffort(Effort.VERY_HIGH);
+    buildConfig.setParallelism(4);
+    buildConfig.setImplementationStrategies(ImplementationStrategy.MAXELER1, ImplementationStrategy.MAXELER2, ImplementationStrategy.MAXELER3, ImplementationStrategy.MAXELER4);
+
+    m.build();
+  }
 }
