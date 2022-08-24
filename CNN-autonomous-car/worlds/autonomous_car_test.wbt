@@ -1,4 +1,46 @@
 #VRML_SIM R2022b utf8
+
+EXTERNPROTO "webots://projects/vehicles/protos/tesla/TeslaModel3.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/Sassafras.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/Pine.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/Oak.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/Forest.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/Cypress.proto"
+EXTERNPROTO "webots://projects/objects/trees/protos/BigSassafras.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/SpeedLimitSign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/PedestrianCrossing.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/OrderSign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/CautionSign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/YieldSign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/StopSign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/StopPanel.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/SpeedLimitPanel.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/OrderPanel.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/HighwaySign.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/CautionPanel.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/TrafficCone.proto"
+EXTERNPROTO "webots://projects/objects/traffic/protos/HighwayPole.proto"
+EXTERNPROTO "webots://projects/objects/road/protos/Road.proto"
+EXTERNPROTO "webots://projects/objects/road/protos/Crossroad.proto"
+EXTERNPROTO "webots://projects/objects/obstacles/protos/OilBarrel.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/UBuilding.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/TheThreeTowers.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/Hotel.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/CyberboticsTower.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/Church.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/BuildingUnderConstruction.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/BigGlassTower.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/Museum.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/Auditorium.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/ResidentialBuilding.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/ModernSuburbanHouse.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/HollowBuilding.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/FastFoodRestaurant.proto"
+EXTERNPROTO "webots://projects/objects/buildings/protos/CommercialBuilding.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "webots://projects/objects/advertising_board/protos/AdvertisingBoard.proto"
+
 WorldInfo {
   info [
     "Autonomous Vehicle Simulation"
@@ -1067,8 +1109,10 @@ ModernSuburbanHouse {
 DEF AUTONOMOUS_CAR TeslaModel3 {
   translation 216.574 -20.0771 0.4
   rotation 0 0 1 -2.0937353071795863
-  controller "CNN_autonomous_car_fpga"
-  controllerArgs ["2"]
+  controller "<extern>"
+  controllerArgs [
+    "2"
+  ]
   supervisor TRUE
   sensorsSlotFront [
     Camera {

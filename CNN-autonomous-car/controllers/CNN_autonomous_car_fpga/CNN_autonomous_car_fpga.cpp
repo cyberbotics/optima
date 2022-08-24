@@ -469,7 +469,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
       // quit simulation after 120s (optional)
-      if (simTime > 120) {
+      if (simTime > 600) {
         wb_supervisor_simulation_quit(0);
       }
     }
