@@ -59,8 +59,10 @@ static vector<fixed_point_t> cnnOutput(cnnOutputSize);
 static double simTime = 0;
 static double realTime = 0;
 static double stepTime = 0;
+static double beginEndTime = 0;
 static double imgTime = 0;
 static double netAccTime = 0;
+static double imgAccTime = 0;
 
 WbDeviceTag camera;
 
@@ -298,8 +300,11 @@ int main(int argc, const char *argv[]) {
 
   // time variables
   struct timeval simStart;
+  struct timeval stepStart;
   struct timeval stepEnd;
+  struct timeval imgEnd;
   gettimeofday(&simStart, NULL);
+  gettimeofday(&stepEnd, NULL);
 
   int stepCount = 0;
 
@@ -315,14 +320,12 @@ int main(int argc, const char *argv[]) {
       if (wb_robot_step_begin(timeStep) == -1)
         break;
 
-      struct timeval step_start;
-      gettimeofday(&step_start, NULL);
+      gettimeofday(&stepStart, NULL);
 
       // get and normalize new image
       process_new_image();
 
-      struct timeval img_end;
-      gettimeofday(&img_end, NULL);
+      gettimeofday(&imgEnd, NULL);
 
       ConvNetwork_actions_t actions;
       set_dfe_actions(&actions);
@@ -354,9 +357,14 @@ int main(int argc, const char *argv[]) {
       gettimeofday(&stepEnd, NULL);
       simTime = wb_robot_get_time();
       realTime = elapsed_time(simStart, stepEnd);
-      imgTime = elapsed_time(step_start, img_end);
-      stepTime = elapsed_time(step_start, stepEnd);
+      imgTime = elapsed_time(stepStart, imgEnd);
+      // printf("imgTime = %f\n\n", imgTime);
+      stepTime = elapsed_time(stepStart, stepEnd);
+      // printf("stepTime = %f\n\n", stepTime);
+      beginEndTime = elapsed_time(stepEnd, stepStart);
+      // printf("step_begin + step_end time = %f\n\n", beginEndTime);
       netAccTime += stepTime - imgTime;
+      imgAccTime += imgTime;
 
       stepCount++;
 
@@ -364,6 +372,7 @@ int main(int argc, const char *argv[]) {
       display_logs(carPosition, stepCount, 300);
       if (stepCount % 300 == 0 || stepCount == 1) {
         printf("mean network time = %f\n\n", netAccTime / stepCount);
+        printf("mean img time = %f\n\n", imgAccTime / stepCount);
       }
 #endif
 
@@ -394,7 +403,7 @@ int main(int argc, const char *argv[]) {
 
         struct timeval end;
         gettimeofday(&end, NULL);
-        float cnn_time = elapsed_time(start, end);
+        // float cnn_time = elapsed_time(start, end);
         // printf("Run time = %f\n", cnn_time);
 
         float steering =
@@ -432,7 +441,6 @@ int main(int argc, const char *argv[]) {
   /****** MODE 2 => (WEBOTS RENDERING + IMAGE PROCESSING) // CNN ******/
   case 2:
     while (wb_robot_step(timeStep) != -1) {
-
       // get and normalize new image
       process_new_image();
 
@@ -444,6 +452,7 @@ int main(int argc, const char *argv[]) {
             fixedpt_to_float(cnnOutput[0]) * TARGET_STDS[0] + TARGET_MEANS[0];
         float speed =
             fixedpt_to_float(cnnOutput[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
+
         // printf("steering = %f\n", steering);
         // printf("speed = %f\n\n", speed);
 
@@ -469,7 +478,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
       // quit simulation after 120s (optional)
-      if (simTime > 600) {
+      if (simTime > 120) {
         wb_supervisor_simulation_quit(0);
       }
     }
