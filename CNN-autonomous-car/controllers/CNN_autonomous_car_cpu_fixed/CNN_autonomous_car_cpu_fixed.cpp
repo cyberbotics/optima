@@ -38,6 +38,10 @@ typedef int64_t fixed_point_t;
 
 using namespace std;
 
+const int inputSize = 3 * 80 * 320;
+vector<fixed_point_t> inputFixed(inputSize);
+WbDeviceTag camera;
+
 double elapsed_time(struct timeval start, struct timeval end) {
   return (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) * 1e-6;
 }
@@ -421,7 +425,41 @@ void load_weights() {
   wfile.close();
 }
 
+void process_new_image() {
+  // get camera image
+  const unsigned char *inputChar = wb_camera_get_image(camera);
+
+  //  normalize input image
+  omp_set_num_threads(8); // Optimal is 12
+#pragma omp parallel for
+  for (int i = 0; i < inputSize; i++) {
+    int segment = (i / (inputSize / 3));
+    int idx = 4 * ((floor((i - segment * (inputSize / 3)) / 320)) * 320 +
+                   (i - segment * (inputSize / 3)) % 320) +
+              (2 - segment);
+    float pxValue = inputChar[idx];
+    float mean, std;
+
+    if (segment == 0) {
+      mean = INPUT_MEANS[0];
+      std = INPUT_STDS[0];
+    } else if (segment == 1) {
+      mean = INPUT_MEANS[1];
+      std = INPUT_STDS[1];
+    } else {
+      mean = INPUT_MEANS[2];
+      std = INPUT_STDS[2];
+    }
+
+    inputFixed[i] = float_to_fixedpt((pxValue - mean) / std);
+  }
+}
+
 int main(void) {
+  // load CNN parameters
+  load_weights();
+  printf("Weights and biases successfully loaded !\n");
+
   // create the driver instance.
   wbu_driver_init();
 
@@ -429,20 +467,25 @@ int main(void) {
   int timeStep = (int)wb_robot_get_basic_time_step();
 
   // enable camera
-  WbDeviceTag camera = wb_robot_get_device("camera");
+  camera = wb_robot_get_device("camera");
   wb_camera_enable(camera, timeStep);
-
-  // load CNN parameters
-  load_weights();
-  printf("Weights and biases successfully loaded !\n");
 
   // int exit;
   int stepCount = 0;
   double simTime = 0;
   double realTime = 0;
+  double stepTime = 0;
+  double imgTime = 0;
+  double netAccTime = 0;
+  double imgAccTime = 0;
+  double beginEndAccTime = 0;
 
   struct timeval simStart;
+  struct timeval stepStart;
+  struct timeval stepEnd;
+  struct timeval imgEnd;
   gettimeofday(&simStart, NULL);
+  gettimeofday(&stepEnd, NULL);
 
   wb_robot_step(timeStep);
 
@@ -450,34 +493,12 @@ int main(void) {
     if (wb_robot_step_begin(timeStep) == -1)
       break;
 
-    int input_size = 3 * 80 * 320;
-    vector<fixed_point_t> inputFixed;
-
-    // get camera image
-    const unsigned char *input_char = wb_camera_get_image(camera);
+    gettimeofday(&stepStart, NULL);
 
     // normalize input image
-    for (int i = 0; i < input_size / 3; i++) {
-      int idx = 4 * ((floor(i / 320)) * (320) + (i % 320)) + 2;
-      float pxValue = input_char[idx];
-      inputFixed.push_back(
-          float_to_fixedpt((pxValue - INPUT_MEANS[0]) / INPUT_STDS[0]));
-    }
-    for (int i = input_size / 3; i < 2 * input_size / 3; i++) {
-      int idx = 4 * ((floor((i - input_size / 3) / 320)) * (320) +
-                     ((i - input_size / 3) % 320)) +
-                1;
-      float pxValue = input_char[idx];
-      inputFixed.push_back(
-          float_to_fixedpt((pxValue - INPUT_MEANS[1]) / INPUT_STDS[1]));
-    }
-    for (int i = 2 * input_size / 3; i < input_size; i++) {
-      int idx = 4 * ((floor((i - 2 * input_size / 3) / 320)) * (320) +
-                     ((i - 2 * input_size / 3) % 320));
-      float pxValue = input_char[idx];
-      inputFixed.push_back(
-          float_to_fixedpt((pxValue - INPUT_MEANS[2]) / INPUT_STDS[2]));
-    }
+    process_new_image();
+
+    gettimeofday(&imgEnd, NULL);
 
     // compute forward propagation from input image
     vector<fixed_point_t> result;
@@ -488,12 +509,21 @@ int main(void) {
     float speed =
         fixedpt_to_float(result[1]) * TARGET_STDS[1] + TARGET_MEANS[1];
 
-    // time informations
-    struct timeval now;
-    gettimeofday(&now, NULL);
+    // Apply steering and speed values to car
+    wbu_driver_set_cruising_speed(speed);
+    wbu_driver_set_steering_angle(steering * 1.7);
 
+    // time informations
+    beginEndAccTime += elapsed_time(stepEnd, stepStart);
+    gettimeofday(&stepEnd, NULL);
     simTime = wb_robot_get_time();
-    realTime = elapsed_time(simStart, now);
+    realTime = elapsed_time(simStart, stepEnd);
+    imgTime = elapsed_time(stepStart, imgEnd);
+    // printf("imgTime = %f\n\n", imgTime);
+    stepTime = elapsed_time(stepStart, stepEnd);
+    // printf("stepTime = %f\n\n", stepTime);
+    netAccTime += stepTime - imgTime;
+    imgAccTime += imgTime;
 
     stepCount++;
     if (stepCount % 300 == 0 || stepCount == 1) {
@@ -502,16 +532,16 @@ int main(void) {
       printf("Simulation elapsed time = %f\n", simTime);
       printf("Mean simulation speed ratio = %f\n", simTime / realTime);
       printf("Mean step duration (real time) = %f\n\n", realTime / stepCount);
+      printf("STEP DETAILS\n");
+      printf("  Mean network time = %f\n", netAccTime / stepCount);
+      printf("  Mean normalization time = %f\n", imgAccTime / stepCount);
+      printf("  Mean begin/end time = %f\n\n", beginEndAccTime / stepCount);
     }
 
     // quit simulation after 120s (optional)
     if (simTime > 120) {
       wb_supervisor_simulation_quit(0);
     }
-
-    // Apply steering and speed values to car
-    wbu_driver_set_cruising_speed(speed);
-    wbu_driver_set_steering_angle(steering * 1.7);
 
   } while (wb_robot_step_end() != -1);
 

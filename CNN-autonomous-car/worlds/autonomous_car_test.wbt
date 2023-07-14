@@ -1,4 +1,4 @@
-#VRML_SIM R2022b utf8
+#VRML_SIM R2023b utf8
 
 EXTERNPROTO "webots://projects/vehicles/protos/tesla/TeslaModel3.proto"
 EXTERNPROTO "webots://projects/objects/trees/protos/Sassafras.proto"
@@ -50,7 +50,7 @@ WorldInfo {
   ]
   title "City"
   ERP 0.6
-  basicTimeStep 30
+  basicTimeStep 38
   lineScale 1
   contactProperties [
     ContactProperties {
@@ -115,8 +115,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.14491045311440265 0.1424014979667207 -0.97914389849246 1.6093090039230264
-  position 215.1457546521558 35.68939009675305 20.167115591802325
+  orientation 0.12618973585108917 0.07940747319259603 -0.9888228374016246 2.028349838868699
+  position 235.23198670305968 29.379858402466407 18.198282190576332
   near 1
   follow "vehicle"
   followSmoothness 0
