@@ -66,3 +66,5 @@ The different controller source codes are located in `CNN-autonomous-car/control
 The DFE optimization of the neural network is compiled in a shared library: `CNN-autonomous-car/libraries/cnn_dfe`. The corresponding DFE kernels and manager are in: `CNN-autonomous-car/libraries/cnn_dfe/src`.
 
 You can select the controller to drive the car by editing the controller field in `CNN-autonomous-car/worlds/autonomous_car_test.wbt` and then [run Webots](https://github.com/cyberbotics/optima/wiki/Start-Webots) on Jumax.
+
+A GPU is now available on jumaxbuild1. It is recommended to run Webots on jumaxbuild1 and the controller as extern on jumax-cpu. Detailed instructions can be found on the following page: [How to run the most optimized car simulation](https://github.com/cyberbotics/optima/wiki/How-to-run-the-most-optimized-car-simulation).
