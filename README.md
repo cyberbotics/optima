@@ -61,6 +61,7 @@ The different controller source codes are located in `CNN-autonomous-car/control
 * **CNN_autonomous_car_cpu_float**: this controller contains the naive version of the neural network with floating point represention to drive the car. 
 * **CNN_autonomous_car_cpu_fixed**: this controller is the optimized CPU version of the neural network with fixed point representation and multithreading to drive the car.
 * **CNN_autonomous_car_fpga**: this controller uses the _cnn_dfe_ library to run the neural network on a DFE. This controller has 3 different loop optimization modes. The mode must be passed through the controllerArgs field in `CNN-autonomous-car/worlds/autonomous_car_test.wbt`.
+* **CNN_autonomous_car_fpga_optimized**: this controller uses the _cnn_dfe_ library to run the neural network on a DFE. This controller implements only one step loop of CNN_autonomous_car_fpga. It is the final, most optimized FPGA version of the controller, described in the [Deliverable 2 results](https://github.com/cyberbotics/optima/wiki/Deliverable-2:-CNN-performance-comparison-CPU-FPGA).
 
 The DFE optimization of the neural network is compiled in a shared library: `CNN-autonomous-car/libraries/cnn_dfe`. The corresponding DFE kernels and manager are in: `CNN-autonomous-car/libraries/cnn_dfe/src`.
 
